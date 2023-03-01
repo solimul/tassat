@@ -2503,7 +2503,7 @@ static void yals_connect (Yals * yals) {
     yals_msg (yals, 1, "eagerly computing break values");
 
   yals_init_weight_to_score_table (yals);
-  printf ("c allocation worker %d %d\n",0, yals->stats.allocated.current);
+  //printf ("c allocation worker %d %d\n",0, yals->stats.allocated.current);
 }
 
 /*------------------------------------------------------------------------*/
@@ -4550,9 +4550,9 @@ void set_tid (Yals *yals, int tid)
 
 static void yals_connect_palsat (Yals * yals) {
 
-  int idx, n, lit, nvars = yals->nvars, * count, cidx, sign;
+  int idx, lit, nvars = yals->nvars, * count, cidx, sign;
   long long sumoccs, sumlen; int minoccs, maxoccs, minlen, maxlen;
-  int * occsptr, occs, len, lits, maxidx, nused, uniform;
+  int  occs, len, maxidx, nused, uniform;
   int nclauses, nbin, ntrn, nquad, nlarge;
   const int * p,  * q;
 
@@ -4789,7 +4789,7 @@ static void yals_connect_palsat (Yals * yals) {
     yals_msg (yals, 1, "eagerly computing break values");
   
   yals_init_weight_to_score_table (yals);
-  printf ("c allocation worker %d %d\n",yals->tid, yals->stats.allocated.current);
+  //printf ("c allocation worker %d %d\n",yals->tid, yals->stats.allocated.current);
 }
 
 int yals_sat_palsat (Yals * yals, int primaryworker) {
