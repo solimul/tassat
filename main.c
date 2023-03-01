@@ -8,6 +8,7 @@
 
 #define YALSINTERNAL
 #include "yils.h"
+#include "blackboard.c"
 
 /*------------------------------------------------------------------------*/
 
@@ -420,19 +421,42 @@ static void * run (void * p) {
   assert (0 <= widx), assert (widx < threads);
   yals_set_wid (w->yals, widx);
   yals_set_threadspecvals (w->yals, widx, threads);
-  res = yals_sat (w->yals);
+  res = yals_sat_palsat (w->yals, widx == 0);
   if (res && setdone (widx, res) == widx)
     msg ("worker %d wins with result %d", widx, res);
   else msg ("worker %d returns with %d", widx, res);
   return p;
 }
 
+void create_primary_thread ()
+{
+  set_primary_worker (worker[0].yals);
+  set_tid (worker [0].yals, 0);
+  yals_fnpointers (worker[0].yals, get_cdb_start, get_cdb_end, get_cdb_top, get_occs, get_noccs, get_refs, get_lits , get_numvars, get_preprocessed_trail, get_preprocessed_trail_size, set_preprocessed_trail);
+  if (pthread_create (&worker[0].thread, 0, run, worker))
+    die ("failed to created thread %d", 0);
+  else
+  {
+    msg ("created thread %d", 0);
+    while (1)
+      if (init_done (primaryworker))
+        break;
+  } 
+}
+
 static int palsat () {
   int i;
-  for (i = 0; i < threads; i++)
+  create_primary_thread ();
+  for (i = 1; i < threads; i++)
+  {
+    yals_fnpointers (worker[i].yals, get_cdb_start, get_cdb_end, get_cdb_top, get_occs, get_noccs, get_refs, get_lits ,get_numvars, get_preprocessed_trail, get_preprocessed_trail_size, set_preprocessed_trail);
+    set_tid (worker [i].yals, i);
+
     if (pthread_create (&worker[i].thread, 0, run, worker + i))
       die ("failed to created thread %d", i);
     else msg ("created thread %d", i);
+  }
+  //delete_temp_shared_structures ();
   for (i = 0; i < threads; i++)
     if (pthread_join (worker[i].thread, 0))
       die ("failed to join thread %d", i);
@@ -845,9 +869,10 @@ BODY:
   if (!lit) n--;
 #ifdef PALSAT
   {
-    int i;
-    for (i = 0; i < threads; i++)
-      yals_add (worker[i].yals, lit);
+    yals_add (worker[0].yals, lit);
+    // int i;
+    // for (i = 0; i < threads; i++)
+    //   yals_add (worker[i].yals, lit);
   }
 #else
   yals_add (yals, lit);

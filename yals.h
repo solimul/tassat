@@ -66,6 +66,8 @@ int yals_nunsat_external (Yals *yals);
 /*------------------------------------------------------------------------*/
 
 void yals_stats (Yals *);
+int yals_sat_palsat (Yals *, int);
+
 
 /*------------------------------------------------------------------------*/
 
@@ -77,5 +79,33 @@ void yals_setmsglock (Yals *,
        void (*lock)(void*), void (*unlock)(void*), void*);
 
 /*------------------------------------------------------------------------*/
+
+int init_done (Yals *yals);
+int * cdb_top (Yals *yals);
+int * cdb_start (Yals *yals);
+int * cdb_end (Yals *yals);
+int * occs (Yals *yals);
+int noccs (Yals *yals);
+int * refs (Yals *yals);
+int * lits (Yals *yals);
+int num_vars (Yals *yals);
+void set_tid (Yals *yals, int tid);
+int * preprocessed_trail (Yals *yals);
+int  preprocessed_trail_size (Yals *yals);
+
+void yals_fnpointers (Yals *yals, 
+                            int * (*get_cdb_start)( ),
+                            int * (*get_cdb_end)( ),
+                            int * (*get_cdb_top)( ),
+                            int * (*get_occs) (),
+                            int  (*get_noccs) (),
+                            int * (*get_refs) (),
+                            int * (*get_lits) (),
+                            int (*get_numvars) (),
+                            int * (*get_preprocessed_trail) (),
+                            int (*get_preprocessed_trail_size) (),
+                            void (*set_preprocessed_trail) ()
+                            );
+void set_shared_structures (Yals *yals);
 
 #endif

@@ -547,6 +547,21 @@ struct Yals {
   int consecutive_non_improvement, last_flip_unsat_count;
   int force_restart, fres_count;
   int fres_fact;
+
+  int preprocessing_done;
+  int primary_worker;
+  int * (*get_cdb_top)( );
+  int * (*get_cdb_end)( );
+  int * (*get_cdb_start)( );
+  int (*get_numvars) ();
+  int * (*get_preprocessed_trail) ();
+  int (*get_preprocessed_trail_size) ();
+  void (*set_preprocessed_trail) ();
+  int * (*get_occs) ();
+  int (*get_noccs) ();  
+  int * (*get_refs) ();   
+  int * (*get_lits) ();
+  int tid;  
 };
 
 /*------------------------------------------------------------------------*/
@@ -2488,6 +2503,7 @@ static void yals_connect (Yals * yals) {
     yals_msg (yals, 1, "eagerly computing break values");
 
   yals_init_weight_to_score_table (yals);
+  printf ("c allocation worker %d %d\n",0, yals->stats.allocated.current);
 }
 
 /*------------------------------------------------------------------------*/
@@ -2703,7 +2719,7 @@ static void yals_reset_cache (Yals * yals) {
 void yals_del (Yals * yals) {
   yals_reset_cache (yals);
   yals_reset_unsat (yals);
-  RELEASE (yals->cdb);
+  if (yals->primary_worker) RELEASE (yals->cdb);
   RELEASE (yals->clause);
   RELEASE (yals->mark);
   RELEASE (yals->mins);
@@ -2718,7 +2734,7 @@ void yals_del (Yals * yals) {
   RELEASE (yals->minlits);
   if (yals->unsat.usequeue) DELN (yals->lnk, yals->nclauses);
   else DELN (yals->pos, yals->nclauses);
-  DELN (yals->lits, yals->nclauses);
+  if (yals->primary_worker) DELN (yals->lits, yals->nclauses);
   if (yals->crit) DELN (yals->crit, yals->nclauses);
   if (yals->weightedbreak) DELN (yals->weightedbreak, 2*yals->nvars);
   if (yals->satcntbytes == 1) DELN (yals->satcnt1, yals->nclauses);
@@ -2730,8 +2746,8 @@ void yals_del (Yals * yals) {
   DELN (yals->tmp, yals->nvarwords);
   DELN (yals->clear, yals->nvarwords);
   DELN (yals->set, yals->nvarwords);
-  DELN (yals->occs, yals->noccs);
-  if (yals->refs) DELN (yals->refs, 2*yals->nvars);
+  if (yals->primary_worker) DELN (yals->occs, yals->noccs);
+  if (yals->primary_worker) {if (yals->refs) DELN (yals->refs, 2*yals->nvars);}
   if (yals->flips) DELN (yals->flips, yals->nvars);
 #ifndef NYALSTATS
   DELN (yals->stats.inc, yals->stats.nincdec);
@@ -3456,6 +3472,7 @@ DONE:
 
 int yals_sat (Yals * yals) {
   int res, limited = 0, lkhd;
+  yals->primary_worker = 1;
   if (!EMPTY (yals->clause))
     yals_abort (yals, "added clause incomplete in 'yals_sat'");
 
@@ -4448,6 +4465,421 @@ void yals_set_threadspecvals (Yals * yals, int widx, int nthreads)
     yals->nthreads = nthreads;
   }
 }
+
+int * cdb_start (Yals * yals) {return yals->cdb.start;}
+
+int * cdb_top (Yals * yals){return yals->cdb.top;}
+
+int * cdb_end (Yals * yals){return yals->cdb.end;}
+
+int * occs (Yals *yals) {return yals->occs;}
+
+int * refs (Yals *yals) {return yals->refs;}
+
+int * lits (Yals *yals) {return yals->lits;}
+
+int  noccs (Yals *yals) {return yals->noccs;}
+
+int num_vars (Yals *yals) { return yals->nvars;}
+
+
+
+int * preprocessed_trail (Yals *yals) 
+{
+  int sz = COUNT (yals->trail);
+  int *  arr = malloc (sz* sizeof (int));
+  for (int next = 0; next < COUNT (yals->trail); next++) {
+    int lit = PEEK (yals->trail, next);
+    arr [next] = lit;
+  } 
+  return arr;
+}
+
+int preprocessed_trail_size (Yals *yals) {return COUNT (yals->trail);}
+
+int init_done (Yals *yals) { return yals->preprocessing_done;}
+
+void yals_fnpointers (Yals *yals, 
+                            int * (*get_cdb_start)( ),
+                            int * (*get_cdb_end)( ),
+                            int * (*get_cdb_top)( ),
+                            int * (*get_occs) (),
+                            int  (*get_noccs) (),
+                            int * (*get_refs) (),
+                            int * (*get_lits) (),
+                            int (*get_numvars) (),
+                            int * (*get_preprocessed_trail) (),
+                            int (*get_preprocessed_trail_size) (),
+                            void (*set_preprocessed_trail) ()
+                            )
+{
+    yals->get_cdb_start = get_cdb_start;    
+    yals->get_cdb_end = get_cdb_end;    
+    yals->get_cdb_top = get_cdb_top;
+    yals->get_occs = get_occs;
+    yals->get_noccs = get_noccs;
+    yals->get_numvars = get_numvars;
+    yals->get_refs = get_refs;
+    yals->get_lits = get_lits;
+    yals->get_preprocessed_trail = get_preprocessed_trail;
+    yals->get_preprocessed_trail_size = get_preprocessed_trail_size;
+    yals->set_preprocessed_trail = set_preprocessed_trail;
+}
+
+void set_shared_structures (Yals *yals)
+{
+  yals->cdb.top = yals->get_cdb_top ();
+  yals->cdb.start = yals->get_cdb_start ();
+  yals->cdb.end = yals->get_cdb_end ();
+  yals->occs = yals->get_occs ();
+  yals->noccs = yals->get_noccs ();
+  yals->refs = yals->get_refs ();
+  yals->lits = yals->get_lits ();
+  yals->nvars = yals->get_numvars ();
+  int * arr = yals->get_preprocessed_trail ();
+  int sz = yals->get_preprocessed_trail_size ();
+  CLEAR (yals->trail);
+  for (int i=0; i<sz; i++)
+    PUSH (yals->trail, arr [i]);
+}
+
+void set_tid (Yals *yals, int tid)
+{
+  yals->tid = tid;
+}
+
+static void yals_connect_palsat (Yals * yals) {
+
+  int idx, n, lit, nvars = yals->nvars, * count, cidx, sign;
+  long long sumoccs, sumlen; int minoccs, maxoccs, minlen, maxlen;
+  int * occsptr, occs, len, lits, maxidx, nused, uniform;
+  int nclauses, nbin, ntrn, nquad, nlarge;
+  const int * p,  * q;
+
+  RELEASE (yals->mark);
+  RELEASE (yals->clause);
+  
+
+  maxlen = 0;
+  sumlen = 0;
+  minlen = INT_MAX;
+  nclauses = nbin = ntrn = nquad = nlarge = 0;
+  for (p = yals->cdb.start; p < yals->cdb.top; p = q + 1) {
+    for (q = p; *q; q++)
+      ;
+    len = q - p;
+
+         if (len == 2) nbin++;
+    else if (len == 3) ntrn++;
+    else if (len == 4) nquad++;
+    else               nlarge++;
+
+    nclauses++;
+
+    sumlen += len;
+    if (len > maxlen) maxlen = len;
+    if (len < minlen) minlen = len;
+  }
+
+  yals_msg (yals, 1,
+    "found %d binary, %d ternary and %d large clauses",
+    nbin, ntrn, nclauses - nbin - ntrn);
+
+  yals_msg (yals, 1,
+    "size of literal stack %d (%d for large clauses only)",
+    (int) COUNT (yals->cdb),
+    ((int) COUNT (yals->cdb)) - 3*nbin - 4*ntrn);
+
+  yals->maxlen = maxlen;
+  yals->minlen = minlen;
+#ifndef NYALSTATS
+  yals->stats.nincdec = MAX (maxlen + 1, 3);
+  NEWN (yals->stats.inc, yals->stats.nincdec);
+  NEWN (yals->stats.dec, yals->stats.nincdec);
+#endif
+
+  if ((INT_MAX >> LENSHIFT) < nclauses)
+    yals_abort (yals,
+      "maximum number of clauses %d exceeded",
+      (INT_MAX >> LENSHIFT));
+
+  yals->nclauses = nclauses;
+  yals->nbin = nbin;
+  yals->ntrn = ntrn;
+  yals_msg (yals, 1, "connecting %d clauses", nclauses);
+  
+  //NEWN (yals->lits, nclauses);
+
+  // lits = 0;
+  // int c = 0;
+  // p=0, q=0;
+  // for (p = yals->cdb.start; p < yals->cdb.top; p = q + 1) 
+  // {
+  //   yals->lits [c++] = lits;
+  //   for (q = p; *q; q++)
+  //     lits++;
+  //   lits++;
+  // }
+  
+  //assert (lits == yals->cdb.top - yals->cdb.start);
+  
+  NEWN (yals->weights, MAXLEN + 1);
+
+  NEWN (count, 2*nvars);
+  count += nvars;
+
+  maxidx = maxoccs = -1;
+  minoccs = INT_MAX;
+  sumoccs = 0;
+
+
+  for (cidx = 0; cidx < yals->nclauses; cidx++) {
+    for (p = yals_lits (yals, cidx); (lit = *p); p++) {
+      
+      idx = ABS (lit);
+      if (idx > maxidx) maxidx = idx;
+      count[lit]++;
+    }
+  }
+  
+
+  occs = 0;
+  nused = 0;
+  for (lit = 1; lit < nvars; lit++) {
+    int pos = count[lit], neg = count[-lit], sum = pos + neg;
+    occs += sum + 2;
+    if (sum) nused++;
+  }
+
+  
+
+  assert (nused <= nvars);
+  if (nused == nvars)
+    yals_msg (yals, 1, "all variables occur");
+  else
+    yals_msg (yals, 1,
+      "%d variables used out of %d, %d do not occur %.0f%%",
+      nused, nvars, nvars - nused, yals_pct (nvars-nused, nvars));
+
+  yals->noccs = occs;
+  LOG ("size of occurrences stack %d", occs);
+  
+  yals->avglen = yals_avg (sumlen, yals->nclauses);
+
+  if (minlen == maxlen) {
+    yals_msg (yals, 1,
+      "all %d clauses are of uniform length %d",
+      yals->nclauses, maxlen);
+  } else if (maxlen >= 0) {
+    yals_msg (yals, 1,
+      "average clause length %.2f (min %d, max %d)",
+      yals->avglen, minlen, maxlen);
+    yals_msg (yals, 2,
+      "%d binary %.0f%%, %d ternary %.0f%% ",
+      nbin, yals_pct (nbin, yals->nclauses),
+      ntrn, yals_pct (ntrn, yals->nclauses));
+    yals_msg (yals, 2,
+      "%d quaterny %.0f%%, %d large clauses %.0f%%",
+      nquad, yals_pct (nquad, yals->nclauses),
+      nlarge, yals_pct (nlarge, yals->nclauses));
+  }
+
+  if (minlen == maxlen && !yals->opts.toggleuniform.val) uniform = 1;
+  else if (minlen != maxlen && yals->opts.toggleuniform.val) uniform = 1;
+  else uniform = 0;
+
+  if (uniform) {
+    yals_msg (yals, 1,
+      "using uniform strategy for clauses of length %d", maxlen);
+    yals->uniform = maxlen;
+  } else {
+    yals_msg (yals, 1, "using standard non-uniform strategy");
+    yals->uniform = 0;
+  }
+
+  yals_msg (yals, 1,
+    "clause variable ratio %.3f = %d / %d",
+    yals_avg (nclauses, nused), nclauses, nused);
+
+  for (idx = 1; idx < nvars; idx++)
+    for (sign = 1; sign >= -1; sign -= 2) {
+      lit = sign * idx;
+      int occs = count[lit] + count[-lit];
+      if (!occs) continue;
+      sumoccs += occs;
+      if (occs > maxoccs) maxoccs = occs;
+      if (occs < minoccs) minoccs = occs;
+    }
+
+  count -= nvars;
+  DELN (count, 2*nvars);
+
+  yals_msg (yals, 1,
+    "average literal occurrence %.2f (min %d, max %d)",
+    yals_avg (sumoccs, yals->nvars)/2.0, minoccs, maxoccs);
+
+  if (yals->uniform) yals->pick = yals->opts.unipick.val;
+  else yals->pick = yals->opts.pick.val;
+
+  yals_msg (yals, 1, "picking %s", yals_pick_to_str (yals));
+
+  yals->unsat.usequeue = (yals->pick > 0);
+
+  yals_msg (yals, 1,
+    "using %s for unsat clauses",
+    yals->unsat.usequeue ? "queue" : "stack");
+
+  if (yals->unsat.usequeue) NEWN (yals->lnk, nclauses);
+  else {
+    NEWN (yals->pos, nclauses);
+    for (cidx = 0; cidx < nclauses; cidx++) yals->pos[cidx] = -1;
+  }
+  //printf ("c A %d %d %d %d %d %d %d\n",yals->tid, yals->stats.allocated.current, yals->unsat.usequeue,yals->uniform, yals->opts.unipick.val, yals->opts.pick.val, yals->pick);
+
+  yals->nvarwords = (nvars + BITS_PER_WORD - 1) / BITS_PER_WORD;
+
+  yals_msg (yals, 1, "%d x %d-bit words per assignment (%d bytes = %d KB)",
+    yals->nvarwords,
+    BITS_PER_WORD,
+    yals->nvarwords * sizeof (Word),
+    (yals->nvarwords * sizeof (Word) >> 10));
+
+  NEWN (yals->set, yals->nvarwords);
+  NEWN (yals->clear, yals->nvarwords);
+  memset (yals->clear, 0xff, yals->nvarwords * sizeof (Word));
+  
+
+  while (!EMPTY (yals->trail)) {
+    lit = POP (yals->trail);
+    idx = ABS (lit);
+    if (lit < 0) CLRBIT (yals->clear, yals->nvarwords, idx);
+    else SETBIT (yals->set, yals->nvarwords, idx);
+  }
+ 
+  RELEASE (yals->trail);
+
+  NEWN (yals->vals, yals->nvarwords);
+  NEWN (yals->best, yals->nvarwords);
+  NEWN (yals->tmp, yals->nvarwords);
+  NEWN (yals->flips, nvars);
+
+
+  if (maxlen < (1<<8)) {
+    yals->satcntbytes = 1;
+    NEWN (yals->satcnt1, yals->nclauses);
+  } else if (maxlen < (1<<16)) {
+    yals->satcntbytes = 2;
+    NEWN (yals->satcnt2, yals->nclauses);
+  } else {
+    yals->satcntbytes = 4;
+    NEWN (yals->satcnt4, yals->nclauses);
+  }
+
+  yals_msg (yals, 1,
+    "need %d bytes per clause for counting satisfied literals",
+    yals->satcntbytes);
+
+  if (yals->opts.crit.val) {
+    yals_msg (yals, 1,
+      "dynamically computing break values on-the-fly "
+      "using critical literals");
+    NEWN (yals->crit, nclauses);
+    NEWN (yals->weightedbreak, 2*nvars);
+  } else
+    yals_msg (yals, 1, "eagerly computing break values");
+  
+  yals_init_weight_to_score_table (yals);
+  printf ("c allocation worker %d %d\n",yals->tid, yals->stats.allocated.current);
+}
+
+int yals_sat_palsat (Yals * yals, int primaryworker) {
+  yals->primary_worker = primaryworker;
+  int res, limited = 0, lkhd;
+
+  if(yals->primary_worker)
+  {
+    if (!EMPTY (yals->clause))
+      yals_abort (yals, "added clause incomplete in 'yals_sat'");
+
+    if (yals->mt) {
+      yals_msg (yals, 1, "original formula contains empty clause");
+    return 20;
+    }
+
+    if (yals->opts.prep.val && !EMPTY (yals->trail)) {
+      yals_preprocess (yals);
+      if (yals->mt) {
+        yals_msg (yals, 1,
+	    "formula after unit propagation contains empty clause");
+        return 20;
+      }
+    }
+    yals->set_preprocessed_trail ();
+    
+    yals->stats.time.entered = yals_time (yals);
+
+    if (yals->opts.setfpu.val) yals_set_fpu (yals);
+    
+    yals_connect (yals);
+    yals->preprocessing_done = 1;
+  }
+  else
+  {
+    set_shared_structures (yals);
+    yals_connect_palsat (yals);
+  }
+
+  yals_ddfw_init_build (yals);
+
+
+  res = 0;
+  limited += (yals->limits.flips >= 0);
+#ifndef NYALSMEMS
+  limited += (yals->limits.mems >= 0);
+#endif
+  if (!limited)
+    yals_msg (yals, 1, "starting unlimited search");
+  else {
+
+    if (yals->limits.flips < 0)
+      yals_msg (yals, 1,
+	"search not limited by the number of flips");
+    else
+      yals_msg (yals, 1,
+	"search limited by %lld flips",
+	 (long long) yals->limits.flips);
+
+#ifndef NYALSMEMS
+    if (yals->limits.mems < 0)
+      yals_msg (yals, 1,
+	"search not limited by the number of mems");
+    else
+      yals_msg (yals, 1,
+	"search limited by %lld mems",
+	 (long long) yals->limits.mems);
+#endif
+  }
+
+  yals_outer_loop (yals);
+
+  assert (!yals->mt);
+  if (!yals->stats.best) { 
+    yals_print_strategy (yals, "winning strategy:", 1);
+    yals_check_assignment (yals);
+    res = 10;
+  } else assert (!res);
+
+  if ((lkhd = yals_lkhd_internal (yals)))
+    yals_msg (yals, 1,
+      "most flipped literal %d flipped %lld times",
+      lkhd, (long long) yals->flips[ABS (lkhd)]);
+
+  if (yals->opts.setfpu.val) yals_reset_fpu (yals);
+  yals_flush_time (yals);
+
+  return res;
+}
+
 
 
  
