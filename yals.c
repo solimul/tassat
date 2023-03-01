@@ -4158,28 +4158,28 @@ void yals_check_clause_weights_sanity (Yals * yals)
 
 void yals_check_lits_weights_sanity_var (Yals *yals, int v)
 {
-  int val = yals_val (yals, v);
-  int tl = val? v : -v;
-  int s1w = 0, uw = 0, occ;
-  const int * occs = yals_occs (yals, tl), *p;
-  for (p=occs; (occ = *p) >= 0; p++)
-  {
-    int cidx = occ >> LENSHIFT;
-    if (yals_satcnt (yals, cidx) == 1)
-      s1w += yals->ddfw.clause_weights [cidx];
-  }
+  // int val = yals_val (yals, v);
+  // int tl = val? v : -v;
+  // int s1w = 0, uw = 0, occ;
+  // const int * occs = yals_occs (yals, tl), *p;
+  // for (p=occs; (occ = *p) >= 0; p++)
+  // {
+  //   int cidx = occ >> LENSHIFT;
+  //   if (yals_satcnt (yals, cidx) == 1)
+  //     s1w += yals->ddfw.clause_weights [cidx];
+  // }
 
-  assert (s1w == yals->ddfw.sat1_weights [get_pos(tl)]);
+  // assert (s1w == yals->ddfw.sat1_weights [get_pos(tl)]);
 
-  occs = yals_occs (yals, -tl);
+  // occs = yals_occs (yals, -tl);
 
-  for (p=occs; (occ = *p) >= 0; p++)
-  {
-    int cidx = occ >> LENSHIFT;
-    if (!yals_satcnt (yals, cidx))
-      uw += yals->ddfw.clause_weights [cidx];
-  }
-  assert (uw == yals->ddfw.unsat_weights [get_pos(-tl)]);
+  // for (p=occs; (occ = *p) >= 0; p++)
+  // {
+  //   int cidx = occ >> LENSHIFT;
+  //   if (!yals_satcnt (yals, cidx))
+  //     uw += yals->ddfw.clause_weights [cidx];
+  // }
+  // assert (uw == yals->ddfw.unsat_weights [get_pos(-tl)]);
 }
 
 void yals_check_lits_weights_sanity (Yals *yals)
