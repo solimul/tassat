@@ -3188,7 +3188,7 @@ double linear_wt (Yals * yals, int source, int sink)
   if (yals->ddfw.clause_weights [source] == BASE_WEIGHT)
     return BASE_WEIGHT * (float) (yals->opts.initpmille.val / 1000.0);
   double a = (float) yals->opts.currpmille.val / 1000.0;
-  double c = (float) yals->opts.basepmille.val / 1000.0;
+  double c = BASE_WEIGHT * (float) (yals->opts.basepmille.val / 1000.0);
   double w = (double) ((float) yals->ddfw.clause_weights [source] * (float) a +  (float) c);
   return w;
 }
