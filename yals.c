@@ -233,10 +233,10 @@ enum ClausePicking {
   OPT (geomfreq,66,0,100,"geometric picking first frequency (percent)"); \
   OPT (hitlim,-1,-1,INT_MAX,"minimum hit limit"); \
   OPT (keep,0,0,1,"keep assignment during restart"); \
-  OPT (currpmille,75,0,1000,"parameter a for lw-ite"); \
-  OPT (basepmille,75,0,1000,"parameter c for lw-ite"); \
+  OPT (currpmille,75,0,1000,"fraction of current weight to transfer"); \
+  OPT (basepmille,175,0,1000,"fraction of base weight to transfer"); \
+  OPT (initpmille,1000,0,1000,"fraction of initial weight to transfer"); \
   OPT (bestwzero,0, 0, 1,"bestw parameter"); \
-  OPT (initpmille,1000,0,1000,"low value percentage for parameter c for the original ddfw"); \
   OPT (maxtries,0 , 0,INT_MAX,"Maximum number of restarts"); \
   OPT (minchunksize,(1<<8),2,(1<<20),"minium queue chunk size"); \
   OPT (pick,4,-1,4,"-1=pbfs,0=rnd,1=bfs,2=dfs,3=rbfs,4=ubfs"); \
