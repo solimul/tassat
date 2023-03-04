@@ -2,10 +2,10 @@ MAKEFLAGS=-j $(if $(CORES),$(CORES),1)
 CC=@CC@
 CFLAGS=@CFLAGS@
 LIBS=@LIBS@
-all: yalsat palsat libyals.a
-yalsat: main.o libyals.a makefile
+all: tassat ptassat libyals.a
+tassat: main.o libyals.a makefile
 	$(CC) $(CFLAGS) -o $@ main.o -L. -lyals $(LIBS)
-palsat: pain.o libyals.a makefile
+ptassat: pain.o libyals.a makefile
 	$(CC) $(CFLAGS) -o $@ pain.o -L. -lyals $(LIBS) -pthread
 libyals.a: yals.o config.o
 	ar rc $@ yals.o config.o
@@ -25,4 +25,4 @@ cflags.h: makefile
 	echo '#define YALS_CC "$(shell $(CC) --version|head -1)"' >>$@
 	echo '#define YALS_CFLAGS "$(CFLAGS)"' >>$@
 clean:
-	rm -f yalsat palsat *.a *.o makefile config.h cflags.h
+	rm -f tassat ptassat *.a *.o makefile config.h cflags.h

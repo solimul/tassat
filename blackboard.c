@@ -1,13 +1,13 @@
 
 #include "blackboard.h"
 
-void set_primary_worker (Yals *yals) 
+void set_primary_worker (Yals *yals)
 {
     primaryworker = yals;
     preprocessedtrail_size = -1;
 }
 
-void set_preprocessed_trail () 
+void set_preprocessed_trail ()
 {
     preprocessedtrail_size = preprocessed_trail_size (primaryworker);
     preprocessedtrail = malloc (preprocessedtrail_size* sizeof (int));
