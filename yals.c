@@ -226,7 +226,7 @@ enum ClausePicking {
   OPT (crit,1,0,1,"dynamic break values (using critical lits)"); \
   OPT (cutoff,0 , 0,INT_MAX,"Maximum number of restarts"); \
   OPT (ddfwpicklit, 4,1,6,"1=best,2=urand,4=wrand"); \
-  OPT (ddfwonly, 0,0,1,"1=only emply ddfw,0=employ a combination of heuristics"); \
+  OPT (ddfwonly, 1,0,1,"1=only emply ddfw,0=employ a combination of heuristics"); \
   OPT (ddfwstartth, 10000,10,1000000,"use to compute threshold for #unsat_cluase/#total_clause to start ddfw."); \
   OPT (defrag,1,0,1,"defragemtation of unsat queue"); \
   OPT (fixed,4,0,INT_MAX,"fixed default strategy frequency (1=always)"); \
@@ -236,7 +236,7 @@ enum ClausePicking {
   OPT (currpmille,75,0,1000,"fraction of current weight to transfer"); \
   OPT (basepmille,175,0,1000,"fraction of base weight to transfer"); \
   OPT (initpmille,1000,0,1000,"fraction of initial weight to transfer"); \
-  OPT (bestwzero,0, 0, 1,"bestw parameter"); \
+  OPT (bestwzero,1, 0, 1,"bestw parameter"); \
   OPT (maxtries,0 , 0,INT_MAX,"Maximum number of restarts"); \
   OPT (minchunksize,(1<<8),2,(1<<20),"minium queue chunk size"); \
   OPT (pick,4,-1,4,"-1=pbfs,0=rnd,1=bfs,2=dfs,3=rbfs,4=ubfs"); \
@@ -245,7 +245,7 @@ enum ClausePicking {
   OPT (rbfsrate,10,1,INT_MAX,"relaxed BFS rate"); \
   OPT (reluctant,1,0,1,"reluctant doubling of restart interval"); \
   OPT (restart,100000,0,INT_MAX,"basic (inner) restart interval"); \
-  OPT (innerrestartoff, 0 ,0,1,"disable inner restart"); \
+  OPT (innerrestartoff, 1 ,0,1,"disable inner restart"); \
   OPT (restartouter,0,0,1,"enable restart outer"); \
   OPT (restartouterfactor,100,1,INT_MAX,"outer restart interval factor"); \
   OPT (setfpu,1,0,1,"set FPU to use double precision on Linux"); \
@@ -265,7 +265,6 @@ enum ClausePicking {
   OPT (weight,5,1,8,"maximum clause weight"); \
   OPT (witness,1,0,1,"print witness"); \
   OPT (wtrule,2,1,6,"weight transfer rule"); \
-  OPTSTEMPLATENDEBUG
 
 #ifndef NDEBUG
 #define OPTSTEMPLATENDEBUG \
