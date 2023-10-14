@@ -1,4 +1,8 @@
-Copyright (c) 2013-2019, Armin Biere, Johannes Kepler University.
+/*-------------------------------------------------------------------------*/
+/* TaSSAT is an SLS solver that implements an weight transferring algorithm. 
+It is based on Yalsat (by Armin Biere)
+Copyright (C) 2023-2029  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carnegie Mellon University, Pittsburgh, PA, USA. */
+/*-------------------------------------------------------------------------*/
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
