@@ -1,5 +1,7 @@
 /*-------------------------------------------------------------------------*/
-/* Copyright 2013-2019 Armin Biere Johannes Kepler University Linz Austria */
+/* TaSSAT is an SLS solver that implements an weight transferring algorithm. 
+It is based on Yalsat (by Armin Biere)
+Copyright (C) 2023-2029  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carnegie Mellon University, Pittsburgh, PA, USA. */
 /*-------------------------------------------------------------------------*/
 
 #include "yals.h"
@@ -225,8 +227,8 @@ enum ClausePicking {
   OPT (correct,0,0,1,"correct CB value depending on maximum length"); \
   OPT (crit,1,0,1,"dynamic break values (using critical lits)"); \
   OPT (cutoff,0 , 0,INT_MAX,"Maximum number of restarts"); \
-  OPT (ddfwpicklit, 4,1,6,"1=best,2=urand,4=wrand"); \
-  OPT (ddfwonly, 0,0,1,"1=only emply ddfw,0=employ a combination of heuristics"); \
+  OPT (ddfwpicklit, 1,1,6,"1=best,2=urand,4=wrand"); \
+  OPT (liwetonly, 1,0,1,"1=only emply ddfw,0=employ a combination of heuristics"); \
   OPT (ddfwstartth, 10000,10,1000000,"use to compute threshold for #unsat_cluase/#total_clause to start ddfw."); \
   OPT (defrag,1,0,1,"defragemtation of unsat queue"); \
   OPT (fixed,4,0,INT_MAX,"fixed default strategy frequency (1=always)"); \
@@ -236,7 +238,7 @@ enum ClausePicking {
   OPT (currpmille,75,0,1000,"fraction of current weight to transfer"); \
   OPT (basepmille,175,0,1000,"fraction of base weight to transfer"); \
   OPT (initpmille,1000,0,1000,"fraction of initial weight to transfer"); \
-  OPT (bestwzero,0, 0, 1,"bestw parameter"); \
+  OPT (bestwzero,1, 0, 1,"bestw parameter"); \
   OPT (maxtries,0 , 0,INT_MAX,"Maximum number of restarts"); \
   OPT (minchunksize,(1<<8),2,(1<<20),"minium queue chunk size"); \
   OPT (pick,4,-1,4,"-1=pbfs,0=rnd,1=bfs,2=dfs,3=rbfs,4=ubfs"); \
@@ -245,7 +247,7 @@ enum ClausePicking {
   OPT (rbfsrate,10,1,INT_MAX,"relaxed BFS rate"); \
   OPT (reluctant,1,0,1,"reluctant doubling of restart interval"); \
   OPT (restart,100000,0,INT_MAX,"basic (inner) restart interval"); \
-  OPT (innerrestartoff, 0 ,0,1,"disable inner restart"); \
+  OPT (innerrestartoff, 1 ,0,1,"disable inner restart"); \
   OPT (restartouter,0,0,1,"enable restart outer"); \
   OPT (restartouterfactor,100,1,INT_MAX,"outer restart interval factor"); \
   OPT (setfpu,1,0,1,"set FPU to use double precision on Linux"); \
@@ -265,7 +267,6 @@ enum ClausePicking {
   OPT (weight,5,1,8,"maximum clause weight"); \
   OPT (witness,1,0,1,"print witness"); \
   OPT (wtrule,2,1,6,"weight transfer rule"); \
-  OPTSTEMPLATENDEBUG
 
 #ifndef NDEBUG
 #define OPTSTEMPLATENDEBUG \
@@ -3339,7 +3340,7 @@ static int yals_inner_loop (Yals * yals) {
     if (yals_need_to_restart_inner (yals)) 
     {
       yals_restart_inner (yals);
-      if (!yals->opts.ddfwonly.val) 
+      if (!yals->opts.liwetonly.val) 
         yals->ddfw.ddfw_active = 0;
     }
     else
@@ -3802,7 +3803,7 @@ void yals_init_ddfw (Yals *yals)
   yals->ddfw.min_unsat_flips_span = 0; 
   yals->force_restart = 0;
   yals->fres_count = 0;
-  yals->ddfw.ddfw_active = yals->opts.ddfwonly.val;
+  yals->ddfw.ddfw_active = yals->opts.liwetonly.val;
   yals->ddfw.recent_max_reduction = -1;
   yals->last_flip_unsat_count = -1;
   yals->consecutive_non_improvement = 0;
@@ -4076,14 +4077,11 @@ void yals_ddfw_update_lit_weights_on_break (Yals * yals, int cidx, int lit)
 int yals_pick_literal_ddfw (Yals * yals)
 { 
   /* pick_method=1: selects the variable that reduces unsat weight the most
-     pick_method=2 (--urand): selects an unsat weight reducing variable at uniform-random
-     pick_method=3 (--optplusurand): with less than 0.20 probability selects sub-optimally
-     pick-method=4 (--wrand): selects an unsat reducing variable with a probability, proportal to its unsat weight reduction value.
   */
   
   if (yals->ddfw.pick_method == 1) 
     return yals->ddfw.best_var;
-  else if (yals->ddfw.pick_method == 2) 
+  /*else if (yals->ddfw.pick_method == 2) 
     return yals->ddfw.uwrvs[yals_rand_mod (yals, yals->ddfw.uwrvs_size)]; 
   else if (yals->ddfw.pick_method == 3) 
   {
@@ -4102,13 +4100,7 @@ int yals_pick_literal_ddfw (Yals * yals)
           return  yals->ddfw.uwrvs[i];
       }
 //    return yals->ddfw.best_var;
-  }
-
-
-  // random uwrvs selection
-  // int pos = yals_rand_mod (yals, yals->ddfw.uwrvs_size);
-  // lit = yals->ddfw.uwrvs[pos];
-
+  }*/
   return yals->ddfw.best_var;
 }
 
@@ -4421,7 +4413,7 @@ int yals_inner_loop_max_tries (Yals * yals)
     if (!yals_nunsat(yals))
       return 1;
     yals_restart_inner (yals);
-    if (!yals->opts.ddfwonly.val) 
+    if (!yals->opts.liwetonly.val) 
         yals->ddfw.ddfw_active = 0;
     for (int c=0; c<yals->opts.cutoff.val; ++c)
     {

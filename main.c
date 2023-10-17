@@ -1,5 +1,7 @@
 /*-------------------------------------------------------------------------*/
-/* Copyright 2013-2019 Armin Biere Johannes Kepler University Linz Austria */
+/* TaSSAT is an SLS solver that implements an weight transferring algorithm. 
+It is based on Yalsat (by Armin Biere)
+Copyright (C) 2023-2029  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carnegie Mellon University, Pittsburgh, PA, USA. */
 /*-------------------------------------------------------------------------*/
 
 #include "yals.h"
@@ -60,11 +62,11 @@ static int logging, checking;
 #ifdef PALSAT
 #define YALS worker[0].yals
 #define WINNER worker[winner].yals
-#define NAME "PalSAT"
+#define NAME "PaSSAT"
 #else
 #define YALS yals
 #define WINNER yals
-#define NAME "YalSAT"
+#define NAME "TaSSAT"
 #endif
 
 static double average (double a, double b) { return b ? a/b : 0; }
@@ -629,6 +631,20 @@ static void usage () {
 
 static void version () { printf ("%s\n", yals_version ()); }
 
+static void yals_print_solution ()
+{
+  fflush (stdout);
+  int lit;
+  for (int i = 1; i <= V; i++) {
+	  lit = (yals_deref (WINNER, i) > 0) ? i : -i;
+	  printval (lit);
+  }
+        
+  printval (0);
+  if (nvaline) printvaline ();
+}
+
+
 int main (int argc, char** argv) {
   int i, ch, sign, lit, res, m, n;
   starexechack = 0;
@@ -641,10 +657,10 @@ int main (int argc, char** argv) {
     if (!strcmp (argv[i], "-h")) { usage (); exit (0); }
   }
 #ifdef PALSAT
-  printf ("c PalSAT Yet Another Local Search Solver\n");
-  printf ("c Parallel Simple Portfolio Version\n");
+  printf ("c PaSSAT:  a Local Search Solver for SAT\n");
+  printf ("c Parallel Simple Portfolio Version of TaSSAT\n");
 #else
-  printf ("c YalSAT Yet Another Local Search Solver\n");
+  printf ("c TaSSAT: Transfer and Share for SAT. A Local Search Solver for SAT\n");
   printf ("c Sequential Standalone Version\n");
 #endif
   yals_banner ("c ");
@@ -729,14 +745,14 @@ int main (int argc, char** argv) {
 
     else if (!strcmp (argv[i], "--urandp")) { setopt ("urandp", atoll (argv[++i]));}
 
-    else if (!strcmp (argv[i], "--ddfwonly")) setopt ("ddfwonly", 1);
+    else if (!strcmp (argv[i], "--liwetonly")) setopt ("liwetonly", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--computeneiinit")) setopt ("computeneiinit", 1);
     else if (!strcmp (argv[i], "--stagrestart")) setopt ("stagrestart", 1);
     else if (!strcmp (argv[i], "--clsselectp")) setopt ("clsselectp", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--ddfwstartth")) setopt ("ddfwstartth", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--wtrule")) setopt ("wtrule", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--nosidewaysmove")) setopt ("sidewaysmove", 0);
-    else if (!strcmp (argv[i], "--innerrestartoff")) setopt ("innerrestartoff", 1);
+    else if (!strcmp (argv[i], "--innerrestartoff")) setopt ("innerrestartoff", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--maxtries")) { setopt ("maxtries", atoll (argv[++i]));}
     else if (!strcmp (argv[i], "--cutoff")) { setopt ("cutoff", atoll (argv[++i]));}
     else if (!strcmp (argv[i], "--initpmille")) { setopt ("initpmille", atoll (argv[++i]));}
@@ -893,20 +909,19 @@ DONE:
   msg ("");
 #endif
   if (res != 20) {
-    if (res == 10) fputs ("s SATISFIABLE\n", stdout);
-    else fputs ("s CURRENT BEST\n", stdout);
-    if (yals_getopt (WINNER, "witness")) {
+    if (yals_getopt (WINNER, "target") > 0)
+    {
+      printf ("s CURRENT BEST\n");
+      yals_print_solution ();
+    }
+    else 
+    {
+      if (res == 10) fputs ("s SATISFIABLE\n", stdout);
+      else fputs ("s CURRENT BEST\n", stdout);
+      if (yals_getopt (WINNER, "witness")) {
         if (res == 10) // output model only when it is solved.
-        {
-          fflush (stdout);
-          for (i = 1; i <= V; i++) {
-	        lit = (yals_deref (WINNER, i) > 0) ? i : -i;
-	        printval (lit);
-          }
-        
-          printval (0);
-          if (nvaline) printvaline ();
-        }
+          yals_print_solution ();
+      }
     }
   } else fputs ("s UNSATISFIABLE\n", stdout);
   fflush (stdout);

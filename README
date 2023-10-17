@@ -1,14 +1,4 @@
-default version: runs ddfw with wrand pickmethod, new linear weight transfer rule (if clause_weight [source] > BASE_WEIGHT, returns BASE_WEIGHT), and CSPT=0.1. 
-this version has two parameters (settable from the command line) for the linear rule: 
-           (i) currpmille (range is (0, 1,000) ) and basepmille (range is (0, 10,000))
-           (ii) currpmille: default value is 75, divided by 1,000 in the solver 
-                basepmille: default value is 750, divided by 1,000 in the solver 
-       command: ./yalsat --ddfwonly --innerrestartoff $CNF
-
-NFM-best version: 
-       command: ./yalsat --wtrule 3 --ddfwonly --innerrestartoff $CNF 
-       will run the NFM-best version
-
-Original DDFW version:
-       command: ./yalsat --ddfwonly --innerrestartoff --wtrule 1 --basepmille 250 --greedy --clsselectp 1 $CNF
-         will run the orignal ddfw version
+TaSSAT is an SLS solver that implements an weight transferring algorithm. 
+It is based on Yalsat (by Armin Biere)
+Copyright (C) 2023  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule
+Carnegie Mellon University, Pittsburgh, PA, USA. 
