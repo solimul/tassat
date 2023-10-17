@@ -745,7 +745,7 @@ int main (int argc, char** argv) {
 
     else if (!strcmp (argv[i], "--urandp")) { setopt ("urandp", atoll (argv[++i]));}
 
-    else if (!strcmp (argv[i], "--ddfwonly")) setopt ("ddfwonly", atoll (argv[++i]));
+    else if (!strcmp (argv[i], "--liwetonly")) setopt ("liwetonly", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--computeneiinit")) setopt ("computeneiinit", 1);
     else if (!strcmp (argv[i], "--stagrestart")) setopt ("stagrestart", 1);
     else if (!strcmp (argv[i], "--clsselectp")) setopt ("clsselectp", atoll (argv[++i]));
