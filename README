@@ -4,9 +4,11 @@ this version has two parameters (settable from the command line) for the linear 
            (ii) currpmille: default value is 75, divided by 1,000 in the solver 
                 basepmille: default value is 750, divided by 1,000 in the solver 
        command: ./yalsat --ddfwonly --innerrestartoff $CNF
+
 NFM-best version: 
        command: ./yalsat --wtrule 3 --ddfwonly --innerrestartoff $CNF 
        will run the NFM-best version
+
 Original DDFW version:
        command: ./yalsat --ddfwonly --innerrestartoff --wtrule 1 --basepmille 250 --greedy --clsselectp 1 $CNF
          will run the orignal ddfw version
