@@ -62,11 +62,11 @@ static int logging, checking;
 #ifdef PALSAT
 #define YALS worker[0].yals
 #define WINNER worker[winner].yals
-#define NAME "PalSAT"
+#define NAME "PaSSAT"
 #else
 #define YALS yals
 #define WINNER yals
-#define NAME "YalSAT"
+#define NAME "TaSSAT"
 #endif
 
 static double average (double a, double b) { return b ? a/b : 0; }
@@ -745,14 +745,14 @@ int main (int argc, char** argv) {
 
     else if (!strcmp (argv[i], "--urandp")) { setopt ("urandp", atoll (argv[++i]));}
 
-    else if (!strcmp (argv[i], "--ddfwonly")) setopt ("ddfwonly", 1);
+    else if (!strcmp (argv[i], "--ddfwonly")) setopt ("ddfwonly", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--computeneiinit")) setopt ("computeneiinit", 1);
     else if (!strcmp (argv[i], "--stagrestart")) setopt ("stagrestart", 1);
     else if (!strcmp (argv[i], "--clsselectp")) setopt ("clsselectp", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--ddfwstartth")) setopt ("ddfwstartth", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--wtrule")) setopt ("wtrule", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--nosidewaysmove")) setopt ("sidewaysmove", 0);
-    else if (!strcmp (argv[i], "--innerrestartoff")) setopt ("innerrestartoff", 1);
+    else if (!strcmp (argv[i], "--innerrestartoff")) setopt ("innerrestartoff", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--maxtries")) { setopt ("maxtries", atoll (argv[++i]));}
     else if (!strcmp (argv[i], "--cutoff")) { setopt ("cutoff", atoll (argv[++i]));}
     else if (!strcmp (argv[i], "--initpmille")) { setopt ("initpmille", atoll (argv[++i]));}
