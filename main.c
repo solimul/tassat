@@ -305,6 +305,23 @@ static void resetsighandlers (void) {
   (void) signal (SIGTERM, sig_term_handler);
 }
 
+static void yals_print_solution ()
+{
+  fflush (stdout);
+  int lit;
+  for (int i = 1; i <= V; i++) {
+	  lit = (yals_deref (WINNER, i) > 0) ? i : -i;
+	  printval (lit);
+  }       
+  printval (0);
+  if (nvaline) printvaline ();
+}
+
+void stats_on_cancel ()
+{
+  
+}
+
 static void caughtsigmsg (int sig) {
   if (!verbose) return;
   printf ("c\nc [yalsat] CAUGHT SIGNAL %d\nc\n", sig);
@@ -319,6 +336,7 @@ static void catchsig (int sig) {
     fflush (stdout);
     catchedsig = 1;
     caughtsigmsg (sig);
+    yals_print_solution ();
     stats ();
     caughtsigmsg (sig);
   }
@@ -630,19 +648,6 @@ static void usage () {
 }
 
 static void version () { printf ("%s\n", yals_version ()); }
-
-static void yals_print_solution ()
-{
-  fflush (stdout);
-  int lit;
-  for (int i = 1; i <= V; i++) {
-	  lit = (yals_deref (WINNER, i) > 0) ? i : -i;
-	  printval (lit);
-  }
-        
-  printval (0);
-  if (nvaline) printvaline ();
-}
 
 
 int main (int argc, char** argv) {
