@@ -741,14 +741,9 @@ int main (int argc, char** argv) {
     else if (!strcmp (argv[i], "--target")) setopt ("target",  atoll (argv[++i]));
     
     else if (!strcmp (argv[i], "--greedy")) setopt ("ddfwpicklit", 1);
-    else if (!strcmp (argv[i], "--urand")) setopt ("ddfwpicklit", 2);
-    else if (!strcmp (argv[i], "--optplusurand")) setopt ("ddfwpicklit", 3);
-    else if (!strcmp (argv[i], "--wrand")) setopt ("ddfwpicklit", 4);
     else if (!strcmp (argv[i], "--threadspec")) setopt ("threadspec", 1);
     else if (!strcmp (argv[i], "--csptmax")) setopt ("csptmax", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--csptmin")) setopt ("csptmin", atoll (argv[++i]));
-
-    else if (!strcmp (argv[i], "--urandp")) { setopt ("urandp", atoll (argv[++i]));}
 
     else if (!strcmp (argv[i], "--liwetonly")) setopt ("liwetonly", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--computeneiinit")) setopt ("computeneiinit", 1);
@@ -756,7 +751,6 @@ int main (int argc, char** argv) {
     else if (!strcmp (argv[i], "--clsselectp")) setopt ("clsselectp", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--ddfwstartth")) setopt ("ddfwstartth", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--wtrule")) setopt ("wtrule", atoll (argv[++i]));
-    else if (!strcmp (argv[i], "--nosidewaysmove")) setopt ("sidewaysmove", 0);
     else if (!strcmp (argv[i], "--innerrestartoff")) setopt ("innerrestartoff", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--maxtries")) { setopt ("maxtries", atoll (argv[++i]));}
     else if (!strcmp (argv[i], "--cutoff")) { setopt ("cutoff", atoll (argv[++i]));}

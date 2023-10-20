@@ -251,7 +251,6 @@ enum ClausePicking {
   OPT (restartouter,0,0,1,"enable restart outer"); \
   OPT (restartouterfactor,100,1,INT_MAX,"outer restart interval factor"); \
   OPT (setfpu,1,0,1,"set FPU to use double precision on Linux"); \
-  OPT (sidewaysmove,1,0,1,"enable sideways move"); \
   OPT (stagrestart,0,0,1,"restart when ddfw is stagnent."); \
   OPT (stagrestartfact, 1000, 0, 2000,"stagnant research factor"); \
   OPT (termint,1000,0,INT_MAX,"termination call back check interval"); \
@@ -3355,11 +3354,6 @@ static int yals_inner_loop (Yals * yals) {
           //save_stats_lm (yals);
           if (yals->ddfw.uwrvs_size)
             lit = yals_pick_literal_ddfw (yals);
-          else if (yals->opts.sidewaysmove.val && yals->ddfw.non_increasing_size > 0 && (yals_rand_mod (yals, INT_MAX) % 100) <= 15)
-          {
-            lit = yals_pick_non_increasing (yals);
-            yals->ddfw.sideways++;
-          }
           else
           {
             yals_ddfw_transfer_weights (yals);
@@ -4076,31 +4070,6 @@ void yals_ddfw_update_lit_weights_on_break (Yals * yals, int cidx, int lit)
 
 int yals_pick_literal_ddfw (Yals * yals)
 { 
-  /* pick_method=1: selects the variable that reduces unsat weight the most
-  */
-  
-  if (yals->ddfw.pick_method == 1) 
-    return yals->ddfw.best_var;
-  /*else if (yals->ddfw.pick_method == 2) 
-    return yals->ddfw.uwrvs[yals_rand_mod (yals, yals->ddfw.uwrvs_size)]; 
-  else if (yals->ddfw.pick_method == 3) 
-  {
-    if ( (double)  yals_rand_mod (yals, INT_MAX-1) / (double) (INT_MAX) > yals->ddfw.urandp)
-      return yals->ddfw.uwrvs[yals_rand_mod (yals, yals->ddfw.uwrvs_size)]; 
-    else
-      return yals->ddfw.best_var;
-  }
-  else if (yals->ddfw.pick_method == 4) 
-  {
-      double drand = (double)  yals_rand_mod (yals, INT_MAX-1) / (double) (INT_MAX);
-      for (int i=0; i< yals->ddfw.uwrvs_size; i++)
-      {
-        double gain_ratio = (double) yals->ddfw.uwvars_gains [i] / (double) yals->ddfw.sum_uwr;
-        if (gain_ratio >= drand)
-          return  yals->ddfw.uwrvs[i];
-      }
-//    return yals->ddfw.best_var;
-  }*/
   return yals->ddfw.best_var;
 }
 
