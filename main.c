@@ -1,5 +1,5 @@
 /*-------------------------------------------------------------------------*/
-/* TaSSAT is an SLS solver that implements an weight transferring algorithm. 
+/* TaSSAT is a SLS SAT solver that implements a weight transferring algorithm.
 It is based on Yalsat (by Armin Biere)
 Copyright (C) 2023  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carnegie Mellon University, Pittsburgh, PA, USA. */
 /*-------------------------------------------------------------------------*/
@@ -286,9 +286,9 @@ static void stats () {
   msg ("final minimum of %d unsatisfied clauses", yals_minimum (yals));
   if (verbose) yals_stats (yals);
   msg ("total process time of %.2f seconds", getime ());
-  printf ("\nc Columns: |pick_method| |flips| |unsat| |min_usnat| |alg_switch| |inner_restarts| |fres_fact| |forced_res| |restarts_time| |time| |max_memory|\n");
-  yals_print_stats (yals);
-  printf ("%f %.1f |\n", yals_process_time (), mem.max/(double)(1<<20) );
+  //printf ("\nc Columns: |pick_method| |flips| |unsat| |min_usnat| |alg_switch| |inner_restarts| |fres_fact| |forced_res| |restarts_time| |time| |max_memory|\n");
+  //yals_print_stats (yals);
+  //printf ("%f %.1f |\n", yals_process_time (), mem.max/(double)(1<<20) );
 #endif
   msg ("maximally allocated %.1f MB", mem.max/(double)(1<<20));
 }

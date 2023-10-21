@@ -1,10 +1,12 @@
-yalsat          executable SAT solver
-palsat          executable SAT solver simple portfolio version
+tassat          executable SAT solver
+passat          executable SAT solver simple portfolio version
 main.c          front-end, e.g. dimacs parser, connects to library
 libyals.a       actual library 
 yals.h          library include file
 yals.c          library implementation
 yils.h          internal API calls
+blackboard.h    headers for sharing structures
+blackboard.c    library implementation for sharing structures
 config.c        prints banner (includes configuration)
 config.h        automatically generated from './mkconfig.sh'
 makefile        instantiated from 'makfile.in' by './configure.sh'
