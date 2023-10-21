@@ -53,26 +53,26 @@ void * yals_realloc (Yals *, void*, size_t, size_t);
 
 void yals_srand (Yals *, unsigned long long);
 
-/* ddfw non-static methods */
+/* liwet non-static methods */
 int get_pos (int lit);
-void yals_ddfw_update_lit_weights_on_make (Yals * yals, int cidx, int lit);
-void yals_ddfw_update_lit_weights_at_start (Yals * yals, int cidx, int satcnt, int crit);
-void yals_ddfw_update_lit_weights_at_restart (Yals *yals);
-void yals_ddfw_compute_neighborhood_for_clause (Yals *yals, int cidx);
-void yals_ddfw_compute_uwrvs (Yals * yals);
-int yals_pick_literal_ddfw (Yals * yals);
+void yals_liwet_update_lit_weights_on_make (Yals * yals, int cidx, int lit);
+void yals_liwet_update_lit_weights_at_start (Yals * yals, int cidx, int satcnt, int crit);
+void yals_liwet_update_lit_weights_at_restart (Yals *yals);
+void yals_liwet_compute_neighborhood_for_clause (Yals *yals, int cidx);
+void yals_liwet_compute_uwrvs (Yals * yals);
+int yals_pick_literal_liwet (Yals * yals);
 int yals_pick_non_increasing (Yals * yals);
-void yals_ddfw_init_build (Yals *yals);
+void yals_liwet_init_build (Yals *yals);
 void compute_neighborhood_for_clause_init (Yals *yals, int cidx);
 int yals_pick_literals_random (Yals * yals);
-void yals_ddfw_update_lit_weights_on_break (Yals * yals, int cidx, int lit);
+void yals_liwet_update_lit_weights_on_break (Yals * yals, int cidx, int lit);
 void yals_add_vars_to_uvars (Yals* yals, int cidx);
 int yals_var_in_unsat (Yals *yals, int v);
 void yals_delete_vars_from_uvars (Yals* yals, int cidx);
-void yals_ddfw_update_var_unsat_count (Yals *yals, int cidx);
-int yals_needs_ddfw (Yals *yals); 
+void yals_liwet_update_var_unsat_count (Yals *yals, int cidx);
+int yals_needs_liwet (Yals *yals); 
 void yals_print_stats (Yals * yals); 
-void yals_ddfw_update_uvars (Yals *yals, int cidx);
+void yals_liwet_update_uvars (Yals *yals, int cidx);
 void set_options (Yals * yals);
 void yals_outer_loop_maxtries (Yals * yals);
 void yals_set_wid (Yals * yals, int widx);

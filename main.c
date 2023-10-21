@@ -740,7 +740,7 @@ int main (int argc, char** argv) {
     
     else if (!strcmp (argv[i], "--target")) setopt ("target",  atoll (argv[++i]));
     
-    else if (!strcmp (argv[i], "--greedy")) setopt ("ddfwpicklit", 1);
+    else if (!strcmp (argv[i], "--greedy")) setopt ("liwetpicklit", 1);
     else if (!strcmp (argv[i], "--threadspec")) setopt ("threadspec", 1);
     else if (!strcmp (argv[i], "--csptmax")) setopt ("csptmax", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--csptmin")) setopt ("csptmin", atoll (argv[++i]));
@@ -749,7 +749,7 @@ int main (int argc, char** argv) {
     else if (!strcmp (argv[i], "--computeneiinit")) setopt ("computeneiinit", 1);
     else if (!strcmp (argv[i], "--stagrestart")) setopt ("stagrestart", 1);
     else if (!strcmp (argv[i], "--clsselectp")) setopt ("clsselectp", atoll (argv[++i]));
-    else if (!strcmp (argv[i], "--ddfwstartth")) setopt ("ddfwstartth", atoll (argv[++i]));
+    else if (!strcmp (argv[i], "--liwetstartth")) setopt ("liwetstartth", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--wtrule")) setopt ("wtrule", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--innerrestartoff")) setopt ("innerrestartoff", atoll (argv[++i]));
     else if (!strcmp (argv[i], "--maxtries")) { setopt ("maxtries", atoll (argv[++i]));}
