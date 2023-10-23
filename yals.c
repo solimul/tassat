@@ -4261,7 +4261,7 @@ void yals_delete_vars_from_uvars (Yals* yals, int cidx)
       int top_element = TOP (yals->liwet.uvars);
       POKE (yals->liwet.uvars, remove_pos, top_element);
       yals->liwet.uvar_pos [top_element] = remove_pos;
-      POP (yals->liwet.uvars);
+      _unused(POP (yals->liwet.uvars));
       yals->liwet.uvar_pos [v] = -1;
     }
   }
