@@ -34,6 +34,7 @@ Copyright (C) 2023  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carneg
 #define YALS_INT64_MAX (0x7fffffffffffffffll)
 #define YALS_DEFAULT_PREFIX "c "
 
+#define _unused(x) ((void)(x))
 
 /*------------------------------------------------------------------------*/
 
@@ -1351,35 +1352,38 @@ static void yals_flip_value_of_lit (Yals * yals, int lit) {
 
 static void yals_flush_queue (Yals * yals) {
   assert (yals->unsat.usequeue);
-//  int count = 0;
+  int count = 0;
   Lnk * p;
   for (p = yals->unsat.queue.first; p; p = p->next) {
     int cidx = p->cidx;
     assert_valid_cidx (cidx);
     assert (yals->lnk[cidx] == p);
     yals->lnk[cidx] = 0;
-//    count++;
+    count++;
   }
   yals->unsat.queue.first = yals->unsat.queue.last = 0;
   LOG ("flushed %d queue elements", count);
+  _unused (count);
   assert (count == yals->unsat.queue.count);
   yals->unsat.queue.count = 0;
 }
 
 static void yals_release_lnks (Yals * yals) {
   assert (yals->unsat.usequeue);
-//  int chunks = 0;
+  int chunks = 0;
   int lnks = 0;
   Chunk * q, * n;
   for (q = yals->unsat.queue.chunks; q; q = n) {
     n = q->next;
-//    chunks++;
+    chunks++;
     lnks += q->size - 1;
     DELN (&q->lnks, q->size);
   }
   LOG ("released %d links in %d chunks", lnks, chunks);
   assert (yals->unsat.queue.nchunks == chunks);
+  _unused (chunks);
   assert (yals->unsat.queue.nlnks == lnks);
+  _unused (lnks);
   yals->unsat.queue.chunks = 0;
   yals->unsat.queue.free = 0;
   yals->unsat.queue.nfree = 0;
