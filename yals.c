@@ -1350,15 +1350,15 @@ static void yals_flip_value_of_lit (Yals * yals, int lit) {
 /*------------------------------------------------------------------------*/
 
 static void yals_flush_queue (Yals * yals) {
-  int count = 0;
-  Lnk * p;
   assert (yals->unsat.usequeue);
+//  int count = 0;
+  Lnk * p;
   for (p = yals->unsat.queue.first; p; p = p->next) {
     int cidx = p->cidx;
     assert_valid_cidx (cidx);
     assert (yals->lnk[cidx] == p);
     yals->lnk[cidx] = 0;
-    count++;
+//    count++;
   }
   yals->unsat.queue.first = yals->unsat.queue.last = 0;
   LOG ("flushed %d queue elements", count);
@@ -1367,12 +1367,14 @@ static void yals_flush_queue (Yals * yals) {
 }
 
 static void yals_release_lnks (Yals * yals) {
-  int chunks = 0, lnks = 0;
-  Chunk * q, * n;
   assert (yals->unsat.usequeue);
+//  int chunks = 0;
+  int lnks = 0;
+  Chunk * q, * n;
   for (q = yals->unsat.queue.chunks; q; q = n) {
     n = q->next;
-    chunks++, lnks += q->size - 1;
+//    chunks++;
+    lnks += q->size - 1;
     DELN (&q->lnks, q->size);
   }
   LOG ("released %d links in %d chunks", lnks, chunks);
