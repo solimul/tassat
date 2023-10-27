@@ -305,6 +305,18 @@ static void resetsighandlers (void) {
   (void) signal (SIGTERM, sig_term_handler);
 }
 
+void palsat_print_solution_unfinished (Yals *best)
+{
+  fflush (stdout);
+  int lit;
+  for (int i = 1; i <= V; i++) {
+    lit = (yals_deref (best, i) > 0) ? i : -i;
+    printval (lit);
+  }       
+  printval (0);
+  if (nvaline) printvaline ();
+}
+
 static void yals_print_solution ()
 {
   fflush (stdout);
@@ -328,7 +340,43 @@ static void caughtsigmsg (int sig) {
   fflush (stdout);
 }
 
+int palsat_best_thread_at_abort ()
+{
+  #ifdef PALSAT
+    int bestid = 0, minf=INT_MAX;
+    for (int j = 0; j < threads; j++)
+    {
+      if (minf > yals_minimum (worker [j].yals))
+      {
+        minf = yals_minimum (worker [j].yals);
+        bestid = j;
+      }
+      yals_setopt (worker [j].yals, "verbose", 0);
+    }
+    return bestid;
+  #endif
+  return 0;
+}
+
+
+void palsat_exit_unfinished ()
+{
+    #ifdef PALSAT
+      printf ("s CURRENT BEST \n");
+      int bestid = palsat_best_thread_at_abort ();
+      palsat_print_solution_unfinished (worker[bestid].yals);
+      stats ();
+      msg ("Best thread %d ", bestid);
+      if (yals_minimum (worker [bestid].yals)>1)
+        msg ("Exiting because the best thread %d has reached an assignment with %d unsatisfied clauses",bestid, yals_minimum (worker [bestid].yals));
+      else 
+        msg ("Exiting because the thread %d has reached an assignment with %d unsatisfied clause",bestid, yals_minimum (worker [bestid].yals));
+      exit (0);
+      #endif
+}
+
 static int catchedsig;
+
 
 static void catchsig (int sig) {
   if (!catchedsig) {
@@ -336,8 +384,13 @@ static void catchsig (int sig) {
     fflush (stdout);
     catchedsig = 1;
     caughtsigmsg (sig);
-    yals_print_solution ();
-    stats ();
+    #ifdef PALSAT
+      palsat_exit_unfinished ();
+    #else 
+      printf ("s CURRENT BEST\n");
+      yals_print_solution ();
+      stats ();
+    #endif
     caughtsigmsg (sig);
   }
   resetsighandlers ();
@@ -444,7 +497,12 @@ static void * run (void * p) {
   res = yals_sat_palsat (w->yals, widx == 0);
   if (res && setdone (widx, res) == widx)
     msg ("worker %d wins with result %d", widx, res);
-  else msg ("worker %d returns with %d", widx, res);
+  else 
+  { 
+    msg ("worker %d returns with %d", widx, res);
+    if (yals_getopt (WINNER, "target") > 0 && yals_minimum (WINNER) && res !=  20)
+      palsat_exit_unfinished ();
+  }
   return p;
 }
 
@@ -480,10 +538,9 @@ static int palsat () {
   for (i = 0; i < threads; i++)
     if (pthread_join (worker[i].thread, 0))
       die ("failed to join thread %d", i);
-    else msg ("joined thread %d", i);
-  msg ("");
+    else 
+        msg ("joined thread %d", i);
   return done;
-
 }
 
 #endif

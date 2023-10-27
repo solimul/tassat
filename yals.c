@@ -563,6 +563,7 @@ struct Yals {
   int * (*get_refs) ();   
   int * (*get_lits) ();
   int tid;  
+  int formula_unsat;
 };
 
 /*------------------------------------------------------------------------*/
@@ -3474,11 +3475,13 @@ DONE:
 int yals_sat (Yals * yals) {
   int res, limited = 0, lkhd;
   yals->primary_worker = 1;
+  yals->formula_unsat = 0;
   if (!EMPTY (yals->clause))
     yals_abort (yals, "added clause incomplete in 'yals_sat'");
 
   if (yals->mt) {
     yals_msg (yals, 1, "original formula contains empty clause");
+    yals->formula_unsat = 1;
     return 20;
   }
 
@@ -3487,6 +3490,7 @@ int yals_sat (Yals * yals) {
     if (yals->mt) {
       yals_msg (yals, 1,
 "formula after unit propagation contains empty clause");
+      yals->formula_unsat = 1;
       return 20;
     }
   }
@@ -4670,6 +4674,7 @@ static void yals_connect_palsat (Yals * yals) {
 
 int yals_sat_palsat (Yals * yals, int primaryworker) {
   yals->primary_worker = primaryworker;
+  yals->formula_unsat = 0;
   int res, limited = 0, lkhd;
 
   if(yals->primary_worker)
@@ -4679,7 +4684,8 @@ int yals_sat_palsat (Yals * yals, int primaryworker) {
 
     if (yals->mt) {
       yals_msg (yals, 1, "original formula contains empty clause");
-    return 20;
+      yals->formula_unsat = 1;
+      return 20;
     }
 
     if (yals->opts.prep.val && !EMPTY (yals->trail)) {
@@ -4687,6 +4693,7 @@ int yals_sat_palsat (Yals * yals, int primaryworker) {
       if (yals->mt) {
         yals_msg (yals, 1,
 	    "formula after unit propagation contains empty clause");
+        yals->formula_unsat = 1;
         return 20;
       }
     }
@@ -4756,6 +4763,7 @@ int yals_sat_palsat (Yals * yals, int primaryworker) {
   return res;
 }
 
-
-
- 
+int yals_formula_unsat (Yals *yals)
+{
+  return yals->formula_unsat;
+}

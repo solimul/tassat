@@ -94,6 +94,8 @@ int num_vars (Yals *yals);
 void set_tid (Yals *yals, int tid);
 int * preprocessed_trail (Yals *yals);
 int  preprocessed_trail_size (Yals *yals);
+int yals_formula_unsat (Yals *yals);
+
 
 void yals_fnpointers (Yals *yals, 
                             int * (*get_cdb_start)( ),
