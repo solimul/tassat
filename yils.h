@@ -79,6 +79,7 @@ void yals_set_wid (Yals * yals, int widx);
 int yals_inner_loop_max_tries (Yals * yals);
 double set_cspt (Yals * yals);
 void yals_set_threadspecvals (Yals * yals, int widx, int nthreads);
+void yals_init_tabu (Yals * yals);
 
 
 #endif

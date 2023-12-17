@@ -256,6 +256,7 @@ enum ClausePicking {
   OPT (stagrestartfact, 1000, 0, 2000,"stagnant research factor"); \
   OPT (termint,1000,0,INT_MAX,"termination call back check interval"); \
   OPT (target,0,0,INT_MAX,"unsatisfied clause target"); \
+  OPT (tabuth, -1, -1 , INT_MAX, "threshold for tabu search to prevent variable flip"); \
   OPT (threadspec, 0, 0, 1, "if true, a thread use a set of fixed parameter values (applicable to palsat)"); \
   OPT (toggleuniform,0,0,1,"toggle uniform strategy"); \
   OPT (unfairfreq,50,0,100,"unfair picking first frequency (percent)"); \
@@ -267,7 +268,7 @@ enum ClausePicking {
   OPT (weight,5,1,8,"maximum clause weight"); \
   OPT (witness,1,0,1,"print witness"); \
   OPT (wtrule,2,1,6,"weight transfer rule"); \
-
+OPTSTEMPLATENDEBUG
 #ifndef NDEBUG
 #define OPTSTEMPLATENDEBUG \
   OPT (logging, 0, 0, 1, "set logging level"); \
@@ -339,7 +340,7 @@ typedef struct Strat { STRATSTEMPLATE } Strat;
 
 typedef struct Stats {
   int best, worst, last, tmp, maxstacksize;
-  int64_t flips, bzflips, hits, unsum;
+  int64_t flips, bzflips, hits, unsum, tabuflips;
   struct {
     struct { int64_t count; } outer;
     struct { int64_t count, maxint; } inner;
@@ -564,6 +565,7 @@ struct Yals {
   int * (*get_lits) ();
   int tid;  
   int formula_unsat;
+  int * vars_last_flipped;
 };
 
 /*------------------------------------------------------------------------*/
@@ -1709,6 +1711,8 @@ static void yals_update_minimum (Yals * yals) {
 static void yals_flip_liwet (Yals * yals, int lit) {
   //yals_check_lits_weights_sanity (yals);
   yals->stats.flips++;
+  if (yals->opts.tabuth.val >= 0)
+    yals->vars_last_flipped [abs (lit)] = yals->stats.flips;
   yals->stats.unsum += yals_nunsat (yals);
   yals->liwet.last_flipped = lit;
   //if (yals->stats.flips % 100 == 0)
@@ -2510,6 +2514,8 @@ static void yals_connect (Yals * yals) {
     yals_msg (yals, 1, "eagerly computing break values");
 
   yals_init_weight_to_score_table (yals);
+  if (yals->opts.tabuth.val >=0)
+    yals_init_tabu (yals);
   //printf ("c allocation worker %d %d\n",0, yals->stats.allocated.current);
 }
 
@@ -3875,6 +3881,7 @@ int get_pos (int lit)
 
 void determine_uwvar (Yals *yals , int var)
 {
+  
   int true_lit = yals_val (yals, var) ? var : -var;
   int false_lit = -true_lit;
   /**
@@ -3890,23 +3897,37 @@ void determine_uwvar (Yals *yals , int var)
      
       3) if GAINS (of satisfaction) - LOSS (of satisfaction) > 0, it implies reduction of UNSAT weights.
   **/
-  double flip_gain =
+
+  int tabu =  yals->opts.tabuth.val > -1;
+  if (tabu && yals->vars_last_flipped [var]) 
+    tabu = (yals->stats.flips - yals->vars_last_flipped [var]) <= yals->opts.tabuth.val;
+  else
+    tabu = 0;
+  if (!tabu)
+  {
+    double flip_gain =
         yals->liwet.unsat_weights [get_pos (false_lit)]  
         - yals->liwet.sat1_weights [get_pos (true_lit)];
-  if (flip_gain > 0.0)
-  {
-    yals->liwet.uwrvs [yals->liwet.uwrvs_size] = true_lit;
-    yals->liwet.uwvars_gains [yals->liwet.uwrvs_size] = flip_gain;
-    yals->liwet.uwrvs_size++;
-    if (yals->liwet.best_weight < flip_gain)
+    if (flip_gain > 0.0 && !tabu)
     {
-      yals->liwet.best_var = true_lit;
-      yals->liwet.best_weight = flip_gain;
+      yals->liwet.uwrvs [yals->liwet.uwrvs_size] = true_lit;
+      yals->liwet.uwvars_gains [yals->liwet.uwrvs_size] = flip_gain;
+      yals->liwet.uwrvs_size++;
+      if (yals->liwet.best_weight < flip_gain)
+      {
+        yals->liwet.best_var = true_lit;
+        yals->liwet.best_weight = flip_gain;
+      }
+      yals->liwet.sum_uwr += flip_gain;
     }
-    yals->liwet.sum_uwr += flip_gain;
+    else if (flip_gain == 0.0)
+      yals->liwet.non_increasing [yals->liwet.non_increasing_size++] = true_lit;
   }
-  else if (flip_gain == 0.0)
-    yals->liwet.non_increasing [yals->liwet.non_increasing_size++] = true_lit;
+  // else
+  // {
+  //   if(yals->opts.tabuth.val >= 0)
+  //     yals->stats.tabuflips++;
+  // }
 }
 
 void compute_uwvars_from_unsat_clause (Yals *yals, int cidx)
@@ -4766,4 +4787,10 @@ int yals_sat_palsat (Yals * yals, int primaryworker) {
 int yals_formula_unsat (Yals *yals)
 {
   return yals->formula_unsat;
+} 
+
+void yals_init_tabu (Yals * yals)
+{
+  yals->vars_last_flipped = calloc (yals->nvars, sizeof (int));
+  //yals->stats.tabuflips = 0;
 }

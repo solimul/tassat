@@ -816,6 +816,8 @@ int main (int argc, char** argv) {
     else if (!strcmp (argv[i], "--basepmille")) { setopt ("basepmille", atoll (argv[++i]));}
     else if (!strcmp (argv[i], "--starexechack")) { starexechack = 1;}
     else if (!strcmp (argv[i], "--bestwzero")) { setopt ("bestwzero", 1);}
+    else if (!strcmp (argv[i], "--tabuth")) { setopt ("tabuth", atoll (argv[++i]));}
+
 
 
     
