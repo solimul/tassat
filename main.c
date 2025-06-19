@@ -336,7 +336,7 @@ void stats_on_cancel ()
 
 static void caughtsigmsg (int sig) {
   if (!verbose) return;
-  printf ("c\nc [yalsat] CAUGHT SIGNAL %d\nc\n", sig);
+  printf ("c\nc [tassat] CAUGHT SIGNAL %d\nc\n", sig);
   fflush (stdout);
 }
 
@@ -662,10 +662,10 @@ static int getsystemcores (int explain) {
 static void usage () {
 #ifdef PALSAT
   printf (
-    "usage: palsat [<option> ...] [<file> [<seed>]]\n");
+    "usage: passat [<option> ...] [<file> [<seed>]]\n");
 #else
   printf (
-    "usage: yalsat [<option> ...] [<file> [<seed> [<flips> [<mems>]]]]\n");
+    "usage: tassat [<option> ...] [<file> [<seed> [<flips> [<mems>]]]]\n");
 #endif
   printf ("\n");
   printf ("main options: \n");
