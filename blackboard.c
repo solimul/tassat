@@ -15,10 +15,10 @@ void set_primary_worker (Yals *yals)
 void set_preprocessed_trail ()
 {
     preprocessedtrail_size = preprocessed_trail_size (primaryworker);
-    preprocessedtrail = malloc (preprocessedtrail_size* sizeof (int));
+    preprocessedtrail = malloc (preprocessedtrail_size * sizeof (int));
     int * arr = preprocessed_trail (primaryworker);
-    memcpy (preprocessedtrail, arr, preprocessedtrail_size* sizeof (int));
-    free (arr);
+    memcpy (preprocessedtrail, arr, preprocessedtrail_size * sizeof (int));
+    yals_free (primaryworker, arr, preprocessedtrail_size * sizeof (int));
 }
 
 int * get_cdb_start () { return cdb_start (primaryworker);}
@@ -41,5 +41,4 @@ int * get_preprocessed_trail () { return preprocessedtrail;}
 
 int get_preprocessed_trail_size () { return preprocessedtrail_size;}
 
-//void delete_temp_shared_structures () {free (preprocessed_trail);}
 

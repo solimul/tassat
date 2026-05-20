@@ -25,7 +25,6 @@ Copyright (C) 2023  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carneg
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdarg.h>
 
 /*------------------------------------------------------------------------*/
 #ifdef PALSAT
@@ -220,7 +219,7 @@ static int cmd (const char * arg, const char * suffix, const char * fmt) {
   if (stat (arg, &buf)) die ("can not stat file '%s'", arg);
   len = strlen (fmt) + strlen (arg) + 1;
   cmd = mymalloc (YALS, len);
-  sprintf (cmd, fmt, arg);
+  snprintf (cmd, len, fmt, arg);
   file = popen (cmd, "r");
   myfree (YALS, cmd, len);
   closefile = 2;
@@ -251,14 +250,14 @@ static void printvaline () {
 }
 
 static void printval (int lit) {
-  char buffer[12];
+  char buffer[14]; /* " -2147483648\0" needs 14 bytes */
   int len;
-  sprintf (buffer, " %d", lit);
+  snprintf (buffer, sizeof buffer, " %d", lit);
   len = strlen (buffer);
-  if (nvaline + len + 1 >= sizeof valine) printvaline ();
-  strcpy (valine + nvaline, buffer);
+  if (nvaline + len + 1 >= (int) sizeof valine) printvaline ();
+  memcpy (valine + nvaline, buffer, len + 1);
   nvaline += len;
-  assert (nvaline < sizeof valine);
+  assert (nvaline < (int) sizeof valine);
 }
 
 /*------------------------------------------------------------------------*/
@@ -286,9 +285,6 @@ static void stats () {
   msg ("final minimum of %d unsatisfied clauses", yals_minimum (yals));
   if (verbose) yals_stats (yals);
   msg ("total process time of %.2f seconds", getime ());
-  //printf ("\nc Columns: |pick_method| |flips| |unsat| |min_usnat| |alg_switch| |inner_restarts| |fres_fact| |forced_res| |restarts_time| |time| |max_memory|\n");
-  //yals_print_stats (yals);
-  //printf ("%f %.1f |\n", yals_process_time (), mem.max/(double)(1<<20) );
 #endif
   msg ("maximally allocated %.1f MB", mem.max/(double)(1<<20));
 }
@@ -442,7 +438,8 @@ static int opt (const char * arg) {
     else {
       int len = strlen (arg);
       char * name = mymalloc (0, len - 1), * val;
-      strcpy (name, arg + 2);
+      memcpy (name, arg + 2, len - 2);
+      name[len - 2] = '\0';
       for (val = name; *val && *val != '='; val++)
 	;
       if (!*val) res = setopt (name, 1);
@@ -491,7 +488,7 @@ static int terminate (void * dummy) {
 static void * run (void * p) {
   Worker * w = p;
   int res, widx = w - worker;
-  assert (0 <= widx), assert (widx < threads);
+  assert (0 <= widx && widx < threads);
   yals_set_wid (w->yals, widx);
   yals_set_threadspecvals (w->yals, widx, threads);
   res = yals_sat_palsat (w->yals, widx == 0);
@@ -516,10 +513,9 @@ void create_primary_thread ()
   else
   {
     msg ("created thread %d", 0);
-    while (1)
-      if (init_done (primaryworker))
-        break;
-  } 
+    while (!init_done (primaryworker))
+      usleep (1000);
+  }
 }
 
 static int palsat () {
@@ -534,7 +530,6 @@ static int palsat () {
       die ("failed to created thread %d", i);
     else msg ("created thread %d", i);
   }
-  //delete_temp_shared_structures ();
   for (i = 0; i < threads; i++)
     if (pthread_join (worker[i].thread, 0))
       die ("failed to join thread %d", i);
@@ -754,7 +749,6 @@ int main (int argc, char** argv) {
     Yals * y = yals_new_with_mem_mgr (0, mymalloc, myrealloc, myfree);
     yals_setmsglock (y, lockmsg, unlockmsg, 0);
     yals_seterm (y, terminate, 0);
-//   if (i % 4 == 3) yals_setopt (y, "toggleuniform", 1);
     sprintf (prefix, "c %02d ", i);
     yals_setprefix (y, prefix);
     yals_setime (y, getime);
@@ -883,8 +877,8 @@ int main (int argc, char** argv) {
   {
     unsigned long long newseed = seed;
     for (i = 1; i < threads; i++) {
-      newseed *= 1103515245;
-      newseed += 12345;
+      newseed *= 1103515245u; /* glibc LCG multiplier */
+      newseed += 12345u;      /* glibc LCG increment */
       yals_srand (worker[i].yals, newseed);
       msg ("worker %d uses seed %llu", i, newseed);
     }
