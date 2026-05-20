@@ -36,6 +36,12 @@ Copyright (C) 2023  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carneg
 
 #define _unused(x) ((void)(x))
 
+#ifdef __GNUC__
+#define HOT __attribute__((hot))
+#else
+#define HOT
+#endif
+
 /*------------------------------------------------------------------------*/
 
 #define NEWN(P,N) \
@@ -514,6 +520,8 @@ typedef struct LIWET {
   int min_unsat_flips_span;
   double clsselectp;
   double liwetstartth;
+  int liwetstartth_clauses; /* precomputed: liwetstartth * nclauses */
+  int clsselectp_pct;       /* precomputed: clsselectp * 1000, for integer comparison */
   int guaranteed_uwrvs, missed_guaranteed_uwvars;
 } LIWET;
 
@@ -1122,7 +1130,7 @@ static const char * yals_pick_to_str (Yals * yals) {
   }
 }
 
-static int yals_pick_clause (Yals * yals) {
+static HOT int yals_pick_clause (Yals * yals) {
   int cidx, nunsat = yals_nunsat (yals);
   assert (nunsat > 0);
   if (yals->unsat.usequeue) {
@@ -1274,7 +1282,7 @@ static int yals_pick_by_score (Yals * yals) {
 
 /*------------------------------------------------------------------------*/
 
-static int yals_pick_literal (Yals * yals, int cidx) {
+static HOT int yals_pick_literal (Yals * yals, int cidx) {
   const int pick_break_zero = yals->opts.breakzero.val;
   const int * p, * lits;
   int lit, zero;
@@ -1299,7 +1307,7 @@ static int yals_pick_literal (Yals * yals, int cidx) {
     }
   }
 
-  if (zero) {
+  if (__builtin_expect(!!zero, 0)) {
 
     yals->stats.bzflips++;
     assert (zero == COUNT (yals->cands));
@@ -1457,7 +1465,7 @@ static int yals_need_to_defrag_queue (Yals * yals) {
   if (!yals->opts.defrag.val) return 0;
   if (!yals->unsat.queue.count) return 0;
   if (yals->unsat.queue.nlnks <= yals->opts.minchunksize.val) return 0;
-  if (yals->unsat.queue.count > yals->unsat.queue.nfree/4) return 0;
+  if (yals->unsat.queue.count > yals->unsat.queue.nfree/2) return 0;
   return 1;
 }
 
@@ -1624,7 +1632,7 @@ static void yals_reset_unsat (Yals * yals) {
 
 /*------------------------------------------------------------------------*/
 
-static void yals_make_clauses_after_flipping_lit (Yals * yals, int lit) {
+static HOT void yals_make_clauses_after_flipping_lit (Yals * yals, int lit) {
   const int * p, * occs;
   int cidx, len, occ;
 #if !defined(NDEBUG) || !defined(NYALSTATS)
@@ -1666,7 +1674,7 @@ static void yals_make_clauses_after_flipping_lit (Yals * yals, int lit) {
 #endif
 }
 
-static void yals_break_clauses_after_flipping_lit (Yals * yals, int lit) {
+static HOT void yals_break_clauses_after_flipping_lit (Yals * yals, int lit) {
   const int * p, * occs;
   int occ, cidx, len;
 #if !defined(NDEBUG) || !defined(NYALSTATS)
@@ -3240,19 +3248,20 @@ void yals_liwet_transfer_weights_for_clause (Yals *yals, int sink)
         }
     }
   }
-  // If no such source is available (source=-1), then select a randomly satisfied clause as the source.
-  if (source == -1  || ( ( (double) yals_rand_mod (yals, INT_MAX) / (double) INT_MAX) <= yals->liwet.clsselectp))
+  /* If no source found (or random override), pick a random satisfied clause. */
+  if (source == -1 || yals_rand_mod (yals, 1000) < (unsigned) yals->liwet.clsselectp_pct)
   {
     source = -1;
-    while (source<0)
-    {
-       int clause = yals_rand_mod (yals, INT_MAX) % yals->nclauses;
-       if (yals_satcnt (yals, clause) > 0)
-       {
-         if (yals->liwet.clause_weights [clause] >= BASE_WEIGHT)
-           source = clause;
-       }
+    /* Bounded random search; avoids unbounded rejection-sampling loop. */
+    for (int attempt = yals->nclauses; attempt > 0 && source < 0; attempt--) {
+       int clause = yals_rand_mod (yals, yals->nclauses);
+       if (yals_satcnt (yals, clause) > 0 && yals->liwet.clause_weights [clause] >= BASE_WEIGHT)
+         source = clause;
     }
+    /* Linear fallback when random search found nothing with weight >= BASE_WEIGHT. */
+    for (int clause = 0; clause < yals->nclauses && source < 0; clause++)
+       if (yals_satcnt (yals, clause) > 0)
+         source = clause;
   }
 
   assert (yals_satcnt (yals, source));
@@ -3310,7 +3319,7 @@ void yals_liwet_transfer_weights (Yals *yals)
   yals->liwet.guaranteed_uwrvs = 0;
 }
 
-static void yals_flip (Yals * yals) {
+static HOT void yals_flip (Yals * yals) {
   int cidx = yals_pick_clause (yals);
   int lit = yals_pick_literal (yals, cidx);
   yals->stats.flips++;
@@ -3788,7 +3797,9 @@ void yals_init_liwet (Yals *yals)
                           set_cspt (yals) / 100.0: 
                           (double) yals->opts.clsselectp.val / 100.0;
   yals->fres_fact = floor(((double) yals->nvars / (double) yals->nclauses) * (double) yals->opts.stagrestartfact.val) ;
-  yals->liwet.liwetstartth = 1.0 / (double)  yals->opts.liwetstartth.val;
+  yals->liwet.liwetstartth = 1.0 / (double) yals->opts.liwetstartth.val;
+  yals->liwet.liwetstartth_clauses = (int)(yals->liwet.liwetstartth * yals->nclauses);
+  yals->liwet.clsselectp_pct = (int)(yals->liwet.clsselectp * 1000);
   yals->liwet.min_unsat_flips_span = 0; 
   yals->force_restart = 0;
   yals->fres_count = 0;
@@ -3934,9 +3945,7 @@ void compute_uwvars_from_unsat_clauses2 (Yals *yals)
     for (p = yals->unsat.queue.first; p; p = p->next)
     {
       compute_uwvars_from_unsat_clause (yals, p->cidx);
-      /** IDEA: If number of unsat clasues are large, eg, yals_nunsat (yals) > X
-      then check unsat clauses until we have Y uwrvs, eg, yals->liwet.uwrvs_size>=5 **/
-      //if ((double) yals->liwet.uwrvs_size >10 ) break;
+      if (yals_nunsat (yals) > 100 && yals->liwet.uwrvs_size >= 10) break;
     }
   }
   else
@@ -3945,7 +3954,7 @@ void compute_uwvars_from_unsat_clauses2 (Yals *yals)
     {
       int cidx = PEEK (yals->unsat.stack, c);
       compute_uwvars_from_unsat_clause (yals, cidx);
-      //if (yals_nunsat (yals) > 100 && yals->liwet.uwrvs_size >= 1) break;
+      if (yals_nunsat (yals) > 100 && yals->liwet.uwrvs_size >= 10) break;
     }
   }
   for (int i=0; i < COUNT(yals->liwet.helper_hash_changed_idx1); i++)
@@ -3965,8 +3974,11 @@ void yals_liwet_compute_uwrvs (Yals * yals)
   yals->liwet.sum_uwr = 0;
   
 
-    for (int i=0; i< COUNT(yals->liwet.uvars); i++)
+    for (int i=0; i< COUNT(yals->liwet.uvars); i++) {
       determine_uwvar (yals, PEEK (yals->liwet.uvars, i));
+      if (yals->liwet.uwrvs_size >= 10 && COUNT(yals->liwet.uvars) > 100)
+        break;
+    }
 }
 
 void yals_liwet_create_neighborhood_map (Yals *yals)
@@ -4279,9 +4291,8 @@ void yals_liwet_update_uvars (Yals *yals, int cidx)
 
 int yals_needs_liwet (Yals *yals)
 {
-    double f = ((double) yals_nunsat (yals) / (double) yals->nclauses);
-    int activate =  f <  yals->liwet.liwetstartth || yals_nunsat (yals) < 100;
-    //printf ("\n %f ",yals->liwet.liwetstartth);
+    int nunsat = yals_nunsat (yals);
+    int activate = nunsat < yals->liwet.liwetstartth_clauses || nunsat < 100;
     if (activate)
       yals->liwet.alg_switch++;
     return activate;
