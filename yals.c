@@ -3248,20 +3248,19 @@ void yals_liwet_transfer_weights_for_clause (Yals *yals, int sink)
         }
     }
   }
-  /* If no source found (or random override), pick a random satisfied clause. */
-  if (source == -1 || yals_rand_mod (yals, 1000) < (unsigned) yals->liwet.clsselectp_pct)
+  // If no such source is available (source=-1), then select a randomly satisfied clause as the source.
+  if (source == -1  || ( ( (double) yals_rand_mod (yals, INT_MAX) / (double) INT_MAX) <= yals->liwet.clsselectp))
   {
     source = -1;
-    /* Bounded random search; avoids unbounded rejection-sampling loop. */
-    for (int attempt = yals->nclauses; attempt > 0 && source < 0; attempt--) {
-       int clause = yals_rand_mod (yals, yals->nclauses);
-       if (yals_satcnt (yals, clause) > 0 && yals->liwet.clause_weights [clause] >= BASE_WEIGHT)
-         source = clause;
-    }
-    /* Linear fallback when random search found nothing with weight >= BASE_WEIGHT. */
-    for (int clause = 0; clause < yals->nclauses && source < 0; clause++)
+    while (source<0)
+    {
+       int clause = yals_rand_mod (yals, INT_MAX) % yals->nclauses;
        if (yals_satcnt (yals, clause) > 0)
-         source = clause;
+       {
+         if (yals->liwet.clause_weights [clause] >= BASE_WEIGHT)
+           source = clause;
+       }
+    }
   }
 
   assert (yals_satcnt (yals, source));
@@ -3943,10 +3942,7 @@ void compute_uwvars_from_unsat_clauses2 (Yals *yals)
   if (yals->unsat.usequeue)
   {
     for (p = yals->unsat.queue.first; p; p = p->next)
-    {
       compute_uwvars_from_unsat_clause (yals, p->cidx);
-      if (yals_nunsat (yals) > 100 && yals->liwet.uwrvs_size >= 10) break;
-    }
   }
   else
   {
@@ -3954,7 +3950,6 @@ void compute_uwvars_from_unsat_clauses2 (Yals *yals)
     {
       int cidx = PEEK (yals->unsat.stack, c);
       compute_uwvars_from_unsat_clause (yals, cidx);
-      if (yals_nunsat (yals) > 100 && yals->liwet.uwrvs_size >= 10) break;
     }
   }
   for (int i=0; i < COUNT(yals->liwet.helper_hash_changed_idx1); i++)
@@ -3974,11 +3969,8 @@ void yals_liwet_compute_uwrvs (Yals * yals)
   yals->liwet.sum_uwr = 0;
   
 
-    for (int i=0; i< COUNT(yals->liwet.uvars); i++) {
+    for (int i=0; i< COUNT(yals->liwet.uvars); i++)
       determine_uwvar (yals, PEEK (yals->liwet.uvars, i));
-      if (yals->liwet.uwrvs_size >= 10 && COUNT(yals->liwet.uvars) > 100)
-        break;
-    }
 }
 
 void yals_liwet_create_neighborhood_map (Yals *yals)
