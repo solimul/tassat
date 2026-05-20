@@ -30,4 +30,3 @@ int * get_lits ();
 int get_numvars ();
 int * get_preprocessed_trail ();
 int get_preprocessed_trail_size ();
-void delete_temp_shared_structures ();

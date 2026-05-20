@@ -487,7 +487,7 @@ typedef struct LIWET {
   int * sat_count_in_clause;
   STACK (int) sat_clauses;
   int local_minima, wt_count;
-  int conscutive_lm, count_conscutive_lm, consecutive_lm_length, max_consecutive_lm_length;
+  int consecutive_lm, count_consecutive_lm, consecutive_lm_length, max_consecutive_lm_length;
 
 
   STACK (int) uvars;
@@ -770,9 +770,9 @@ void * yals_realloc (Yals * yals, void * ptr, size_t o, size_t n) {
   assert (!ptr == !o);
   if (!n) { yals_free (yals, ptr, o); return 0; }
   if (!o) return yals_malloc (yals, n);
-  yals_dec_allocated (yals, o);
   res = yals->mem.realloc (yals->mem.mgr, ptr, o, n);
-  if (n && !res) yals_abort (yals, "out of memory in 'yals_realloc'");
+  if (!res) yals_abort (yals, "out of memory in 'yals_realloc'");
+  yals_dec_allocated (yals, o);
   yals_inc_allocated (yals, n);
   if (n > o) memset (res + o, 0, n - o);
   return res;
@@ -812,8 +812,8 @@ void yals_srand (Yals * yals, unsigned long long seed) {
 
 static unsigned yals_rand (Yals * yals) {
   unsigned res;
-  yals->rng.z = 36969 * (yals->rng.z & 65535) + (yals->rng.z >> 16);
-  yals->rng.w = 18000 * (yals->rng.w & 65535) + (yals->rng.w >> 16);
+  yals->rng.z = 36969u * (yals->rng.z & 0xffffu) + (yals->rng.z >> 16); /* MWC generator */
+  yals->rng.w = 18000u * (yals->rng.w & 0xffffu) + (yals->rng.w >> 16); /* MWC generator */
   res = (yals->rng.z << 16) + yals->rng.w;
   return res;
 }
@@ -3322,27 +3322,6 @@ static void yals_flip (Yals * yals) {
   yals->last_flip_unsat_count = yals_nunsat (yals);
 }
 
-/*static void save_stats_lm (Yals * yals)
-{
-  if (!yals->liwet.uwrvs_size)
-  {
-    yals->liwet.conscutive_lm++;
-    yals->liwet.local_minima++;
-  }
-  else
-  {
-    if (yals->liwet.conscutive_lm)
-    {
-      yals->liwet.consecutive_lm_length += yals->liwet.conscutive_lm;
-      yals->liwet.count_conscutive_lm++;
-      if (yals->liwet.max_consecutive_lm_length < yals->liwet.conscutive_lm)
-        yals->liwet.max_consecutive_lm_length = yals->liwet.conscutive_lm;
-    }
-    yals->liwet.conscutive_lm = 0;
-  }
-}*/
-
-
 static int yals_inner_loop (Yals * yals) {
   int res = 0;
   int lit = 0;
@@ -3827,8 +3806,8 @@ void yals_init_liwet (Yals *yals)
   yals->liwet.local_minima = 0;
   yals->liwet.wt_count = 0;
 
-  yals->liwet.conscutive_lm = 0;
-  yals->liwet.count_conscutive_lm = 0;
+  yals->liwet.consecutive_lm = 0;
+  yals->liwet.count_consecutive_lm = 0;
   yals->liwet.consecutive_lm_length = 0;
   yals->liwet.max_consecutive_lm_length = -1;
 
@@ -4215,13 +4194,7 @@ int yals_flip_count (Yals *yals)
 
 void yals_print_stats (Yals * yals)
 {
-  /*double avg_len_consecutive_lm = (double) (yals->liwet.consecutive_lm_length) / (double) (yals->liwet.count_conscutive_lm);
-  printf ("c stats | %d %d %d %d %d %d %d %d %f %d %d %d %d %d %d %d %f ", yals->liwet.pick_method, yals->stats.flips, yals->liwet.local_minima,   yals->liwet.wt_count
-                  , yals->liwet.missed_guaranteed_uwvars, yals->liwet.sideways,
-                  yals->liwet.consecutive_lm_length, yals->liwet.count_conscutive_lm,  avg_len_consecutive_lm, yals->liwet.max_consecutive_lm_length, yals_nunsat (yals),     
-                  yals_minimum (yals), yals->liwet.alg_switch, yals->stats.restart.inner.count, 
-                  yals->fres_fact, yals->fres_count, yals->stats.time.restart);
-                  */
+  (void) yals;
   printf ("c stats | ");
 }
 
@@ -4335,7 +4308,7 @@ int yals_inner_loop_max_tries (Yals * yals)
           yals_liwet_compute_uwrvs (yals);
           if (yals->liwet.uwrvs_size)
             lit = yals_pick_literal_liwet (yals);
-          else if (yals->liwet.non_increasing_size > 0 && (yals_rand_mod (yals, INT_MAX) % 100) <= 15)
+          else if (yals->liwet.non_increasing_size > 0 && yals_rand_mod (yals, 100) <= 15)
             lit = yals_pick_non_increasing (yals);
           else
           {
@@ -4385,14 +4358,12 @@ int num_vars (Yals *yals) { return yals->nvars;}
 
 
 
-int * preprocessed_trail (Yals *yals) 
+int * preprocessed_trail (Yals *yals)
 {
   int sz = COUNT (yals->trail);
-  int *  arr = malloc (sz* sizeof (int));
-  for (int next = 0; next < COUNT (yals->trail); next++) {
-    int lit = PEEK (yals->trail, next);
-    arr [next] = lit;
-  } 
+  int * arr = yals_malloc (yals, sz * sizeof (int));
+  for (int next = 0; next < sz; next++)
+    arr[next] = PEEK (yals->trail, next);
   return arr;
 }
 
