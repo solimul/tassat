@@ -47,7 +47,7 @@ if [ $debug = yes ]
 then
   CFLAGS="-Wall -g3"
 else
-  CFLAGS="-Wall -DNDEBUG -O3"
+  CFLAGS="-Wall -DNDEBUG -O3 -march=native -flto"
 fi
 [ $mems = no ] && CFLAGS="$CFLAGS -DNYALSMEMS"
 [ $stats = no ] && CFLAGS="$CFLAGS -DNYALSTATS"

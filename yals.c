@@ -42,6 +42,8 @@ Copyright (C) 2023  Md Solimul Chowdhury, Cayden Codel, and Marijn Heule, Carneg
 #define HOT
 #endif
 
+typedef struct { double unsat; double sat1; } LitWeight;
+
 /*------------------------------------------------------------------------*/
 
 #define NEWN(P,N) \
@@ -459,7 +461,7 @@ typedef struct LIWET {
  
  
   double * clause_weights;
-  double * unsat_weights, * sat1_weights;
+  LitWeight * weights;
   int init_weight_done;
   STACK (int) satisfied_clauses;
  
@@ -490,7 +492,6 @@ typedef struct LIWET {
   STACK (int) helper_hash_changed_idx1;
   int best_var;
   double best_weight;
-  int * sat_count_in_clause;
   STACK (int) sat_clauses;
   int local_minima, wt_count;
   int consecutive_lm, count_consecutive_lm, consecutive_lm_length, max_consecutive_lm_length;
@@ -692,6 +693,8 @@ static void yals_log_end (Yals * yals) {
 #endif
 /*------------------------------------------------------------------------*/
 
+static inline int get_pos (int lit) { return (abs (lit) << 1) | (lit < 0); }
+
 static double yals_avg (double a, double b) { return b ? a/b : 0; }
 
 static double yals_pct (double a, double b) { return b ? 100.0 * a / b : 0; }
@@ -844,7 +847,7 @@ static int * yals_refs (Yals * yals, int lit) {
   return yals->refs + 2*idx + (lit < 0);
 }
 
-static int * yals_occs (Yals * yals, int lit) {
+static inline int * yals_occs (Yals * yals, int lit) {
   int occs;
   INC (occs);
   occs = *yals_refs (yals, lit);
@@ -852,7 +855,7 @@ static int * yals_occs (Yals * yals, int lit) {
   return yals->occs + occs;
 }
 
-static int yals_val (Yals * yals, int lit) {
+static inline int yals_val (Yals * yals, int lit) {
   int idx = ABS (lit), res = !GETBIT (yals->vals, yals->nvarwords, idx);
   if (lit > 0) res = !res;
   return res;
@@ -901,7 +904,7 @@ static void yals_dec_weighted_break (Yals * yals, int lit, int len) {
   //yals->liwet.init_neighborhood_time += yals_time (yals) - s;
 }
 
-static unsigned yals_satcnt (Yals * yals, int cidx) {
+static inline unsigned yals_satcnt (Yals * yals, int cidx) {
   assert_valid_cidx (cidx);
   //return yals->liwet.sat_count_in_clause [cidx];
   if (yals->satcntbytes == 1) return yals->satcnt1[cidx];
@@ -936,7 +939,6 @@ static unsigned yals_incsatcnt (Yals * yals, int cidx, int lit, int len) {
     res = yals->satcnt4[cidx]++;
     assert (yals->satcnt4[cidx]);
   }
-  yals->liwet.sat_count_in_clause [cidx] = res+1;
   //printf ("\n===> inc %d %d",res, PEEK(yals->clause_size, cidx));
 #ifndef NYALSTATS
   assert (res + 1 <= yals->maxlen);
@@ -968,7 +970,6 @@ static unsigned yals_decsatcnt (Yals * yals, int cidx, int lit, int len) {
     assert (yals->satcnt4[cidx]);
     res = --yals->satcnt4[cidx];
   }
-  yals->liwet.sat_count_in_clause [cidx] = res ;
 #ifndef NYALSTATS
   assert (res + 1 <= yals->maxlen);
   yals->stats.dec[res + 1]++;
@@ -984,6 +985,53 @@ static unsigned yals_decsatcnt (Yals * yals, int cidx, int lit, int len) {
     }
     assert (res || !yals->crit[cidx]);
   }
+  return res;
+}
+
+/* LIWET-specific variants: skip weighted-break updates (liwet_active is always true) */
+static unsigned yals_incsatcnt_liwet (Yals * yals, int cidx, int lit, int len) {
+  unsigned res;
+  (void) len;
+  assert_valid_cidx (cidx);
+  if (yals->satcntbytes == 1) {
+    res = yals->satcnt1[cidx]++;
+    assert (yals->satcnt1[cidx]);
+  } else if (yals->satcntbytes == 2) {
+    res = yals->satcnt2[cidx]++;
+    assert (yals->satcnt2[cidx]);
+  } else {
+    res = yals->satcnt4[cidx]++;
+    assert (yals->satcnt4[cidx]);
+  }
+#ifndef NYALSTATS
+  assert (res + 1 <= yals->maxlen);
+  yals->stats.inc[res]++;
+#endif
+  yals->crit[cidx] ^= lit;
+  assert (res || yals->crit[cidx] == lit);
+  return res;
+}
+
+static unsigned yals_decsatcnt_liwet (Yals * yals, int cidx, int lit, int len) {
+  unsigned res;
+  (void) len;
+  assert_valid_cidx (cidx);
+  if (yals->satcntbytes == 1) {
+    assert (yals->satcnt1[cidx]);
+    res = --yals->satcnt1[cidx];
+  } else if (yals->satcntbytes == 2) {
+    assert (yals->satcnt2[cidx]);
+    res = --yals->satcnt2[cidx];
+  } else {
+    assert (yals->satcnt4[cidx]);
+    res = --yals->satcnt4[cidx];
+  }
+#ifndef NYALSTATS
+  assert (res + 1 <= yals->maxlen);
+  yals->stats.dec[res + 1]++;
+#endif
+  yals->crit[cidx] ^= lit;
+  assert (res || !yals->crit[cidx]);
   return res;
 }
 
@@ -1187,7 +1235,7 @@ do { \
   if (UINT_MAX - (INC) < (SUM)) (SUM) = UINT_MAX; else (SUM) += (INC); \
 } while (0)
 
-static unsigned yals_compute_weighted_break (Yals * yals, int lit) {
+static unsigned yals_compute_weighted_break (Yals * __restrict__ yals, int lit) {
   unsigned wb, b, w, cnt;
   const int * p, * occs;
   int occ, cidx, len;
@@ -1614,10 +1662,8 @@ void yals_reset_liwet (Yals * yals)
 
   for (int i=1; i< yals->nvars; i++)
   {
-    yals->liwet.unsat_weights [get_pos (i)] = 0;
-    yals->liwet.unsat_weights [get_pos (-i)] =0;
-    yals->liwet.sat1_weights [get_pos (i)] = 0;
-    yals->liwet.sat1_weights [get_pos (-i)] = 0;
+    yals->liwet.weights[get_pos(i)]  = (LitWeight){0, 0};
+    yals->liwet.weights[get_pos(-i)] = (LitWeight){0, 0};
   }
 
   // for (int i=0; i< yals->nclauses; i++)
@@ -1632,7 +1678,34 @@ static void yals_reset_unsat (Yals * yals) {
 
 /*------------------------------------------------------------------------*/
 
-static HOT void yals_make_clauses_after_flipping_lit (Yals * yals, int lit) {
+static inline void yals_liwet_update_lit_weights_on_make (Yals * yals, int cidx, int lit)
+{
+  const double w = yals->liwet.clause_weights [cidx];
+  yals->liwet.weights[get_pos(lit)].sat1 += w;
+  int* lits = yals_lits (yals, cidx), *p;
+  int lt;
+  for (p = lits; (lt = *p); p++)
+  {
+    yals->liwet.weights[get_pos(lt)].unsat -= w;
+    yals->liwet.var_unsat_count [abs (lt)]--;
+  }
+}
+
+static inline void yals_liwet_update_lit_weights_on_break (Yals * yals, int cidx, int lit)
+{
+  const double w = yals->liwet.clause_weights [cidx];
+  yals->liwet.weights[get_pos(-lit)].sat1 -= w;
+  int* lits = yals_lits (yals, cidx), *p;
+  int lt;
+  for (p = lits; (lt = *p); p++) {
+    yals->liwet.weights[get_pos(lt)].unsat += w;
+    yals->liwet.var_unsat_count [abs (lt)]++;
+  }
+}
+
+/*------------------------------------------------------------------------*/
+
+static HOT void yals_make_clauses_after_flipping_lit (Yals * __restrict__ yals, int lit) {
   const int * p, * occs;
   int cidx, len, occ;
 #if !defined(NDEBUG) || !defined(NYALSTATS)
@@ -1643,12 +1716,13 @@ static HOT void yals_make_clauses_after_flipping_lit (Yals * yals, int lit) {
   for (p = occs; (occ = *p) >= 0; p++) {
     len = occ & LENMASK;
     cidx = occ >> LENSHIFT;
-    if (yals_incsatcnt (yals, cidx, lit, len))
-    {  
-      if (yals->liwet.sat_count_in_clause [cidx] == 2) // 1 to 2
+    unsigned res_inc = yals_incsatcnt (yals, cidx, lit, len);
+    if (res_inc)
+    {
+      if (__builtin_expect(res_inc == 1, 0)) // 1 to 2 (~10.7%)
       {
-        int other = yals->crit [cidx] ^ lit;      
-        yals->liwet.sat1_weights [get_pos(other)] -= yals->liwet.clause_weights [cidx];
+        int other = yals->crit [cidx] ^ lit;
+        yals->liwet.weights[get_pos(other)].sat1 -= yals->liwet.clause_weights [cidx];
       }
       continue;
     }
@@ -1674,7 +1748,7 @@ static HOT void yals_make_clauses_after_flipping_lit (Yals * yals, int lit) {
 #endif
 }
 
-static HOT void yals_break_clauses_after_flipping_lit (Yals * yals, int lit) {
+static HOT void yals_break_clauses_after_flipping_lit (Yals * __restrict__ yals, int lit) {
   const int * p, * occs;
   int occ, cidx, len;
 #if !defined(NDEBUG) || !defined(NYALSTATS)
@@ -1684,10 +1758,11 @@ static HOT void yals_break_clauses_after_flipping_lit (Yals * yals, int lit) {
   for (p = occs; (occ = *p) >= 0; p++) {
     len = occ & LENMASK;
     cidx = occ >> LENSHIFT;
-    if (yals_decsatcnt (yals, cidx, -lit, len))
+    unsigned res_dec = yals_decsatcnt (yals, cidx, -lit, len);
+    if (res_dec)
     {
-       if (yals->liwet.sat_count_in_clause [cidx] == 1) // 2 to 1
-        yals->liwet.sat1_weights [get_pos(yals->crit[cidx])] += yals->liwet.clause_weights [cidx];
+      if (__builtin_expect(res_dec == 1, 0)) // 2 to 1 (~10.3%)
+        yals->liwet.weights[get_pos(yals->crit[cidx])].sat1 += yals->liwet.clause_weights [cidx];
       continue;
     }
     yals_liwet_update_lit_weights_on_break (yals, cidx, lit);
@@ -1716,6 +1791,81 @@ static void yals_update_minimum (Yals * yals) {
   yals_check_global_invariant (yals);
 }
 
+static HOT void yals_make_clauses_liwet (Yals * __restrict__ yals, int lit) {
+  const int * p, * occs;
+  int cidx, len, occ;
+#if !defined(NDEBUG) || !defined(NYALSTATS)
+  int made = 0;
+#endif
+  assert (yals_val (yals, lit));
+  occs = yals_occs (yals, lit);
+  for (p = occs; (occ = *p) >= 0; p++) {
+    len = occ & LENMASK;
+    cidx = occ >> LENSHIFT;
+    int other = yals->crit[cidx];
+    unsigned res_inc = yals_incsatcnt_liwet (yals, cidx, lit, len);
+    if (__builtin_expect(!!res_inc, 1)) {
+      if (__builtin_expect(res_inc == 1, 0))
+        yals->liwet.weights[get_pos(other)].sat1 -= yals->liwet.clause_weights[cidx];
+      continue;
+    }
+    yals_liwet_update_lit_weights_on_make (yals, cidx, lit);
+    yals_dequeue (yals, cidx);
+    LOGCIDX (cidx, "made");
+#if !defined(NDEBUG) || !defined(NYALSTATS)
+    made++;
+#endif
+  }
+  LOG ("flipping %d has made %d clauses", lit, made);
+#ifndef NYALSMEMS
+  {
+    int updated = p - occs;
+    ADD (update, updated);
+    ADD (crit, updated);
+  }
+#endif
+#ifndef NYALSTATS
+  yals->stats.made += made;
+#endif
+}
+
+static HOT void yals_break_clauses_liwet (Yals * __restrict__ yals, int lit) {
+  const int * p, * occs;
+  int occ, cidx, len;
+#if !defined(NDEBUG) || !defined(NYALSTATS)
+  int broken = 0;
+#endif
+  occs = yals_occs (yals, -lit);
+  for (p = occs; (occ = *p) >= 0; p++) {
+    len = occ & LENMASK;
+    cidx = occ >> LENSHIFT;
+    int new_crit = yals->crit[cidx] ^ (-lit);
+    unsigned res_dec = yals_decsatcnt_liwet (yals, cidx, -lit, len);
+    if (__builtin_expect(!!res_dec, 1)) {
+      if (__builtin_expect(res_dec == 1, 0))
+        yals->liwet.weights[get_pos(new_crit)].sat1 += yals->liwet.clause_weights[cidx];
+      continue;
+    }
+    yals_liwet_update_lit_weights_on_break (yals, cidx, lit);
+    yals_enqueue (yals, cidx);
+    LOGCIDX (cidx, "broken");
+#if !defined(NDEBUG) || !defined(NYALSTATS)
+    broken++;
+#endif
+  }
+  LOG ("flipping %d has broken %d clauses", lit, broken);
+#ifndef NYALSMEMS
+  {
+    int updated = p - occs;
+    ADD (update, updated);
+    ADD (crit, updated);
+  }
+#endif
+#ifndef NYALSTATS
+  yals->stats.broken += broken;
+#endif
+}
+
 static void yals_flip_liwet (Yals * yals, int lit) {
   //yals_check_lits_weights_sanity (yals);
   yals->stats.flips++;
@@ -1736,8 +1886,8 @@ static void yals_flip_liwet (Yals * yals, int lit) {
 //   }
   //
   yals_flip_value_of_lit (yals, lit);
-  yals_make_clauses_after_flipping_lit (yals, -lit);
-  yals_break_clauses_after_flipping_lit (yals, -lit);
+  yals_make_clauses_liwet (yals, -lit);
+  yals_break_clauses_liwet (yals, -lit);
   yals_update_minimum (yals);
   yals->last_flip_unsat_count = yals_nunsat (yals);
   if (yals->liwet.min_unsat < yals_nunsat (yals))
@@ -2176,8 +2326,6 @@ static void yals_update_sat_and_unsat (Yals * yals) {
     if (!satcnt)
       yals_liwet_update_uvars (yals, cidx);
    
-    yals->liwet.sat_count_in_clause [cidx] = satcnt;
-
     if (yals->crit) yals->crit[cidx] = crit;
 
     len = p - lits;
@@ -3168,10 +3316,10 @@ static void yals_init_inner_restart_interval (Yals * yals) {
 void yals_liwet_update_lit_weights_on_weight_transfer (Yals *yals, int cidx, int qncidx, double w)
 {
   if (yals_satcnt (yals, qncidx) == 1)
-    yals->liwet.sat1_weights [get_pos(yals->crit [qncidx])] -= w;
+    yals->liwet.weights[get_pos(yals->crit [qncidx])].sat1 -= w;
   int * lits = yals_lits (yals, cidx), lit;
   while ((lit = *lits++))
-    yals->liwet.unsat_weights [get_pos(lit)] += w;
+    yals->liwet.weights[get_pos(lit)].unsat += w;
 }
 
 double default_wt (Yals * yals, int source, int sink)
@@ -3200,8 +3348,8 @@ double compute_gain (Yals *yals, int lit)
   int true_lit = yals_val (yals, var) ? var : -var;
   int false_lit = -true_lit;
   return
-        yals->liwet.unsat_weights [get_pos (false_lit)]
-        - yals->liwet.sat1_weights [get_pos (true_lit)];
+        yals->liwet.weights[get_pos(false_lit)].unsat
+        - yals->liwet.weights[get_pos(true_lit)].sat1;
 }
 
 double linear_wt (Yals * yals, int source, int sink)
@@ -3827,13 +3975,11 @@ void yals_init_liwet (Yals *yals)
 
   yals->liwet.init_weight_done = 0;
 
-  yals->liwet.sat_count_in_clause = calloc (yals->nclauses, sizeof (int));
   yals->liwet.helper_hash_clauses = calloc (yals->nclauses, sizeof (int));
   yals->liwet.helper_hash_vars = calloc (yals->nvars, sizeof (int));
 
   yals->liwet.clause_weights = malloc (yals->nclauses* sizeof (double));
-  yals->liwet.unsat_weights = calloc (2* yals->nvars, sizeof (double));
-  yals->liwet.sat1_weights = calloc (2* yals->nvars, sizeof (double));
+  yals->liwet.weights = calloc (2 * yals->nvars, sizeof (LitWeight));
   yals->liwet.uwrvs = calloc (yals->nvars, sizeof (int));
   yals->liwet.uwvars_gains = calloc (yals->nvars, sizeof (double));
   yals->liwet.non_increasing = calloc (yals->nvars, sizeof (int));
@@ -3863,16 +4009,10 @@ void yals_init_liwet (Yals *yals)
 }
 
 
-int get_pos (int lit)
+static inline void determine_uwvar (Yals *yals , int var)
 {
-  return  2*(abs (lit)) + (lit < 0);
-}
 
-void determine_uwvar (Yals *yals , int var)
-{
-  
   int true_lit = yals_val (yals, var) ? var : -var;
-  int false_lit = -true_lit;
   /**
       FLIP: true_lit ---> false_lit
       1) unsat_weights [get_pos (false_lit)]
@@ -3894,9 +4034,9 @@ void determine_uwvar (Yals *yals , int var)
     tabu = 0;
   if (!tabu)
   {
-    double flip_gain =
-        yals->liwet.unsat_weights [get_pos (false_lit)]  
-        - yals->liwet.sat1_weights [get_pos (true_lit)];
+    int pos_true = get_pos (true_lit);
+    const LitWeight * lw = yals->liwet.weights;
+    double flip_gain = lw[pos_true ^ 1].unsat - lw[pos_true].sat1;
     if (flip_gain > 0.0 && !tabu)
     {
       yals->liwet.uwrvs [yals->liwet.uwrvs_size] = true_lit;
@@ -4021,34 +4161,6 @@ void yals_liwet_init_build (Yals *yals)
      yals_liwet_create_neighborhood_map (yals);
 }
 
-void yals_liwet_update_lit_weights_on_make (Yals * yals, int cidx, int lit)
-{
-  //double s = yals_time (yals);
-  yals->liwet.sat1_weights [get_pos(lit)] += yals->liwet.clause_weights [cidx];
-  int* lits = yals_lits (yals, cidx), *p;
-  int lt;
-  for (p = lits; (lt = *p); p++)
-  {
-    yals->liwet.unsat_weights [get_pos(lt)] -= yals->liwet.clause_weights [cidx];
-    /** var_unsat_count is for quick decision **/
-    yals->liwet.var_unsat_count [abs (lt)]--;
-  }
-  //yals->liwet.weight_update_time += yals_time (yals) - s;
-}
-
-void yals_liwet_update_lit_weights_on_break (Yals * yals, int cidx, int lit)
-{
-  //double s = yals_time (yals);
-  yals->liwet.sat1_weights [get_pos(-lit)] -= yals->liwet.clause_weights [cidx];
-  int* lits = yals_lits (yals, cidx), *p;
-  int lt;
-  for (p = lits; (lt = *p); p++){
-    yals->liwet.unsat_weights [get_pos(lt)] += yals->liwet.clause_weights [cidx];
-    /** var_unsat_count is for quick decision **/
-    yals->liwet.var_unsat_count [abs (lt)]++;
-  }
-  //yals->liwet.weight_update_time += yals_time (yals) - s;
-}
 
 int yals_pick_literal_liwet (Yals * yals)
 { 
@@ -4147,8 +4259,8 @@ void yals_liwet_update_lit_weights_at_restart_var (Yals *yals, int v)
   }
 
 
-  yals->liwet.sat1_weights [get_pos(tl)] = s1w;
-  yals->liwet.unsat_weights [get_pos (tl)] = uw;
+  yals->liwet.weights[get_pos(tl)].sat1 = s1w;
+  yals->liwet.weights[get_pos(tl)].unsat = uw;
 
   s1w = 0;
   uw = 0;
@@ -4163,8 +4275,8 @@ void yals_liwet_update_lit_weights_at_restart_var (Yals *yals, int v)
     if (yals_satcnt (yals, cidx) == 1)
       s1w += yals->liwet.clause_weights [cidx];
   }
-  yals->liwet.sat1_weights [get_pos (-tl)] = s1w;
-  yals->liwet.unsat_weights [get_pos(-tl)] = uw;
+  yals->liwet.weights[get_pos(-tl)].sat1 = s1w;
+  yals->liwet.weights[get_pos(-tl)].unsat = uw;
 }
 
 void yals_liwet_update_lit_weights_at_restart (Yals *yals)
@@ -4180,10 +4292,10 @@ void yals_liwet_update_lit_weights_at_start (Yals * yals, int cidx, int satcnt, 
   if (!satcnt)
   {
     for (p1 = lits; (lt = *p1); p1++)
-        yals->liwet.unsat_weights [get_pos (lt)] += yals->liwet.clause_weights [cidx];
+        yals->liwet.weights[get_pos(lt)].unsat += yals->liwet.clause_weights [cidx];
   }
   else if (satcnt == 1)
-    yals->liwet.sat1_weights [get_pos (crit)] += yals->liwet.clause_weights [cidx];
+    yals->liwet.weights[get_pos(crit)].sat1 += yals->liwet.clause_weights [cidx];
 }
 
 int yals_nunsat_external (Yals *yals)
